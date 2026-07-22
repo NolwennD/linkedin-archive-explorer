@@ -1,0 +1,107 @@
+#!/usr/bin/env -S java --source 17
+
+import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.spi.ToolProvider;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * Pure-JDK test runner — a JEP 330 single-file source-code program (run as
+ * {@code ./bin/test}, no build tool involved). Compiles the modular production tree (this
+ * enforces the architecture via the JPMS), then compiles and runs the tests on the
+ * classpath with the JUnit standalone console. Run from the project root.
+ */
+public final class Test {
+
+  public static void main(String[] args) throws IOException, InterruptedException {
+    Path junit = junitJar();
+
+    deleteRecursively(Path.of("out"));
+    deleteRecursively(Path.of("out-test"));
+    Files.createDirectories(Path.of("out-test"));
+
+    // 1. Production compile as modules — a forbidden inter-module dependency fails here.
+    runTool("javac", concat(List.of("--module-source-path", "src", "-d", "out"), javaFiles("src")));
+
+    // 2. Classpath of every compiled module output directory.
+    String moduleCp = moduleOutputClasspath();
+
+    // 3. Compile the tests against production classes + JUnit (classpath, no module rules).
+    runTool("javac", concat(
+        List.of("-d", "out-test", "-cp", junit + File.pathSeparator + moduleCp), javaFiles("test")));
+
+    // 4. Run every test discovered on the test classpath (JUnit console jar, separate JVM).
+    int status = new ProcessBuilder(
+        "java", "-jar", junit.toString(), "execute",
+        "-cp", "out-test" + File.pathSeparator + moduleCp,
+        "--scan-class-path=out-test", "--details=tree")
+        .inheritIO().start().waitFor();
+    System.exit(status);
+  }
+
+  private static Path junitJar() throws IOException {
+    try (DirectoryStream<Path> jars =
+        Files.newDirectoryStream(Path.of("lib"), "junit-platform-console-standalone-*.jar")) {
+      Iterator<Path> it = jars.iterator();
+      if (!it.hasNext()) {
+        System.err.println("JUnit console jar not found in lib/");
+        System.exit(1);
+      }
+      return it.next();
+    }
+  }
+
+  /** Colon/semicolon-joined list of every compiled module output directory under out/. */
+  private static String moduleOutputClasspath() throws IOException {
+    try (Stream<Path> dirs = Files.list(Path.of("out"))) {
+      return dirs.filter(Files::isDirectory).map(Path::toString)
+          .collect(Collectors.joining(File.pathSeparator));
+    }
+  }
+
+  private static void runTool(String name, List<String> arguments) {
+    ToolProvider tool = ToolProvider.findFirst(name)
+        .orElseThrow(() -> new IllegalStateException("JDK tool not found: " + name));
+    int status = tool.run(System.out, System.err, arguments.toArray(String[]::new));
+    if (status != 0) {
+      System.err.println(name + " failed (exit " + status + ")");
+      System.exit(status);
+    }
+  }
+
+  private static List<String> javaFiles(String dir) throws IOException {
+    try (Stream<Path> paths = Files.walk(Path.of(dir))) {
+      return paths.filter(p -> p.toString().endsWith(".java")).map(Path::toString).sorted().toList();
+    }
+  }
+
+  private static List<String> concat(List<String> head, List<String> tail) {
+    List<String> all = new ArrayList<>(head);
+    all.addAll(tail);
+    return all;
+  }
+
+  private static void deleteRecursively(Path root) throws IOException {
+    if (!Files.exists(root)) {
+      return;
+    }
+    try (Stream<Path> paths = Files.walk(root)) {
+      paths.sorted(Comparator.reverseOrder()).forEach(p -> {
+        try {
+          Files.delete(p);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      });
+    }
+  }
+}

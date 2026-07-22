@@ -1,0 +1,14 @@
+# Normalise line endings so a Windows checkout can't break the tooling.
+# Text files are stored as LF in the repo and checked out as LF everywhere...
+* text=auto eol=lf
+
+# ...except Windows batch scripts, which need CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Shell scripts must stay LF even on a Windows checkout (redundant but explicit).
+*.sh text eol=lf
+
+# Binaries: never apply end-of-line conversion (would corrupt them).
+*.jar binary
+*.zip binary

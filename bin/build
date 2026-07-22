@@ -1,0 +1,90 @@
+#!/usr/bin/env -S java --source 17
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.spi.ToolProvider;
+import java.util.stream.Stream;
+
+/**
+ * Pure-JDK build — a JEP 330 single-file source-code program (run as {@code ./bin/build},
+ * no build tool involved). Compiles the source tree as modules (this is where the
+ * architecture is enforced), then packages every layer into a single classpath jar
+ * runnable with {@code java -jar}. Run from the project root.
+ *
+ * <p>Invokes {@code javac} and {@code jar} in-process via {@link ToolProvider}. The class
+ * name is irrelevant in source-file mode; only the file name matters.
+ */
+public final class Build {
+
+  private static final String JAR = "dist/linkedin-explorer.jar";
+
+  public static void main(String[] args) throws IOException {
+    deleteRecursively(Path.of("out"));
+    deleteRecursively(Path.of("build"));
+    deleteRecursively(Path.of("dist"));
+    Files.createDirectories(Path.of("build", "classes"));
+    Files.createDirectories(Path.of("dist"));
+
+    // 1. Modular compile — a forbidden inter-module dependency fails here.
+    runTool("javac", concat(List.of("--module-source-path", "src", "-d", "out"), javaFiles("src", false)));
+
+    // 2. Flat compile (module-info excluded) for a plain classpath jar.
+    runTool("javac", concat(List.of("-d", "build/classes"), javaFiles("src", true)));
+
+    // 3. Single runnable jar.
+    runTool("jar", List.of("--create", "--file", JAR,
+        "--main-class", "fr.craft.linkedinarchiveexplorer.cli.Main", "-C", "build/classes", "."));
+
+    System.out.println("Built " + JAR);
+    System.out.println("Run: ./linkedin-archive-explorer [--archive <path>] [--color|--no-color] <term>  (builds on first use)");
+  }
+
+  /** Runs a JDK tool in-process; exits with its status if it fails. */
+  private static void runTool(String name, List<String> arguments) {
+    ToolProvider tool = ToolProvider.findFirst(name)
+        .orElseThrow(() -> new IllegalStateException("JDK tool not found: " + name));
+    int status = tool.run(System.out, System.err, arguments.toArray(String[]::new));
+    if (status != 0) {
+      System.err.println(name + " failed (exit " + status + ")");
+      System.exit(status);
+    }
+  }
+
+  /** Every {@code *.java} under {@code dir}, optionally excluding {@code module-info.java}. */
+  private static List<String> javaFiles(String dir, boolean excludeModuleInfo) throws IOException {
+    try (Stream<Path> paths = Files.walk(Path.of(dir))) {
+      return paths
+          .filter(p -> p.toString().endsWith(".java"))
+          .filter(p -> !excludeModuleInfo || !p.getFileName().toString().equals("module-info.java"))
+          .map(Path::toString)
+          .sorted()
+          .toList();
+    }
+  }
+
+  private static List<String> concat(List<String> head, List<String> tail) {
+    List<String> all = new ArrayList<>(head);
+    all.addAll(tail);
+    return all;
+  }
+
+  private static void deleteRecursively(Path root) throws IOException {
+    if (!Files.exists(root)) {
+      return;
+    }
+    try (Stream<Path> paths = Files.walk(root)) {
+      paths.sorted(Comparator.reverseOrder()).forEach(p -> {
+        try {
+          Files.delete(p);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      });
+    }
+  }
+}

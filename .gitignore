@@ -1,0 +1,15 @@
+out/
+out-test/
+dist/
+build/
+# Keep the data/ directory in the repo (so the default archive lookup has somewhere to
+# look) but never commit the archives dropped into it.
+data/*
+!data/.gitkeep
+test-data/anonymized/
+*.class
+
+# IntelliJ: config is not versioned directly. The template lives in ide/; run
+# ide/setup-intellij.sh (or .cmd) to generate .idea/ and the root .iml.
+.idea/
+/linkedin-archive-explorer.iml

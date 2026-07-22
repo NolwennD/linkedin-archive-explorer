@@ -1,0 +1,45 @@
+#!/usr/bin/env -S java --source 17
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Pure-Java convenience launcher — a JEP 330 single-file source-code program, run via the
+ * shebang above (no compilation step, no build tool). It saves typing
+ * {@code java -jar dist/linkedin-explorer.jar}, and builds the jar on first use when it is
+ * missing.
+ *
+ * <p>Usage, from the project root:
+ * <pre>./linkedin-archive-explorer [--archive &lt;path&gt;] [--color|--no-color] &lt;term&gt;</pre>
+ *
+ * <p>The class name is irrelevant in source-file mode; only the file name matters.
+ */
+public final class Launcher {
+
+  private static final String JAR = "dist/linkedin-explorer.jar";
+  private static final String BUILD_SCRIPT = "bin/build";
+
+  public static void main(String[] args) throws IOException, InterruptedException {
+    if (!new File(JAR).isFile()) {
+      if (!new File(BUILD_SCRIPT).isFile()) {
+        System.err.println("linkedin-archive-explorer: run me from the project root (" + BUILD_SCRIPT + " not found).");
+        System.exit(1);
+      }
+      System.err.println("linkedin-archive-explorer: " + JAR + " is missing — building it first…");
+      int status = exec(List.of("java", "--source", "17", BUILD_SCRIPT));
+      if (status != 0) {
+        System.exit(status);
+      }
+    }
+    List<String> command = new ArrayList<>(List.of("java", "-jar", JAR));
+    command.addAll(List.of(args));
+    System.exit(exec(command));
+  }
+
+  /** Runs a command wired to this process's own terminal, and returns its exit code. */
+  private static int exec(List<String> command) throws IOException, InterruptedException {
+    return new ProcessBuilder(command).inheritIO().start().waitFor();
+  }
+}

@@ -1,0 +1,31 @@
+#!/usr/bin/env -S java --source 17
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+
+/**
+ * Installs the versioned IntelliJ config into place — a JEP 330 single-file source-code
+ * program (run as {@code ./ide/setup-intellij}). {@code .idea/} and the root {@code .iml}
+ * are gitignored (generated), so run this once after cloning to set up the IDE project.
+ * Run from the project root.
+ */
+public final class SetupIntellij {
+
+  public static void main(String[] args) throws IOException {
+    Files.createDirectories(Path.of(".idea", "libraries"));
+    copy("ide/idea/modules.xml", ".idea/modules.xml");
+    copy("ide/idea/misc.xml", ".idea/misc.xml");
+    copy("ide/idea/libraries/junit_platform_console_standalone.xml",
+        ".idea/libraries/junit_platform_console_standalone.xml");
+    copy("ide/linkedin-archive-explorer.iml", "linkedin-archive-explorer.iml");
+
+    System.out.println("IntelliJ config installed (.idea/ + linkedin-archive-explorer.iml).");
+    System.out.println("Open the project, then set the Project SDK to a JDK 17+ if prompted.");
+  }
+
+  private static void copy(String from, String to) throws IOException {
+    Files.copy(Path.of(from), Path.of(to), StandardCopyOption.REPLACE_EXISTING);
+  }
+}

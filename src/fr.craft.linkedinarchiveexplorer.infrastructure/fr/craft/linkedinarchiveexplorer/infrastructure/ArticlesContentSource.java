@@ -25,7 +25,7 @@ public final class ArticlesContentSource implements ContentSource {
     for (String html : archive.readAll(name -> name.contains("Articles") && name.endsWith(".html"))) {
       String url = extractor.url(html);
       if (!url.isBlank()) {
-        contents.add(new Content(ContentType.ARTICLE, Optional.empty(), url, extractor.text(html)));
+        contents.add(new Content(ContentType.ARTICLE, url, extractor.text(html)));
       }
     }
     return contents;

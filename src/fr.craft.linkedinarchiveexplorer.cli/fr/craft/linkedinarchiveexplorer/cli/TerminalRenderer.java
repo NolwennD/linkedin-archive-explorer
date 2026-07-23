@@ -47,7 +47,7 @@ public final class TerminalRenderer {
     return output.toString();
   }
 
-  private String heading(ContentType type) {
+  private static String heading(ContentType type) {
     return switch (type) {
       case ARTICLE -> "ARTICLES";
       case POST -> "POSTS";
@@ -56,8 +56,11 @@ public final class TerminalRenderer {
   }
 
   private String hitHeader(SearchHit hit) {
-    String date = hit.content().date().map(day -> "[" + day + "] ").orElse("");
-    return date + link(hit.content().url());
+    return formateDate(hit) + link(hit.url());
+  }
+
+  private static String formateDate(SearchHit hit) {
+    return hit.date().map(day -> "[" + day + "] ").orElse("");
   }
 
   /**
@@ -73,15 +76,11 @@ public final class TerminalRenderer {
   }
 
   private String highlighted(Excerpt excerpt) {
-    String snippet = excerpt.snippet();
-    if (!styled) {
-      return snippet;
-    }
-    return snippet.substring(0, excerpt.matchStart())
-        + HIGHLIGHT
-        + snippet.substring(excerpt.matchStart(), excerpt.matchEnd())
-        + RESET
-        + snippet.substring(excerpt.matchEnd());
+    return excerpt.render(this::emphasise);
+  }
+
+  private String emphasise(String match) {
+    return styled ? HIGHLIGHT + match + RESET : match;
   }
 
   private String bold(String text) {

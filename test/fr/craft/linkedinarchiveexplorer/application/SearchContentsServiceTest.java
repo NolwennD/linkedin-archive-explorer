@@ -65,7 +65,7 @@ class SearchContentsServiceTest {
             dated(COMMENT, "2024-03-01", "x recent"),
             dated(COMMENT, "2024-02-01", "x middle"));
 
-    List<String> texts = results.groups().get(0).hits().stream().map(h -> h.content().text()).toList();
+    List<String> texts = results.groups().get(0).hits().stream().map(h -> h.content().text().value()).toList();
     assertEquals(List.of("x recent", "x middle", "x old"), texts);
   }
 
@@ -77,7 +77,7 @@ class SearchContentsServiceTest {
             content(POST, Optional.empty(), "x undated"),
             dated(POST, "2024-01-01", "x dated"));
 
-    List<String> texts = results.groups().get(0).hits().stream().map(h -> h.content().text()).toList();
+    List<String> texts = results.groups().get(0).hits().stream().map(h -> h.content().text().value()).toList();
     assertEquals(List.of("x dated", "x undated"), texts);
   }
 

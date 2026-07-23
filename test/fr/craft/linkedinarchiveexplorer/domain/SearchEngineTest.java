@@ -1,15 +1,16 @@
 package fr.craft.linkedinarchiveexplorer.domain;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 class SearchEngineTest {
 
@@ -86,8 +87,8 @@ class SearchEngineTest {
     void locatesTheTermInsideTheSnippet() {
       Excerpt excerpt = firstExcerptOf("world", "hello world");
 
-      assertEquals("hello world", excerpt.snippet());
-      assertEquals("world", excerpt.snippet().substring(excerpt.matchStart(), excerpt.matchEnd()));
+      assertEquals("hello world", excerpt.render(Function.identity()));
+      assertEquals(new SearchTerm("world"), excerpt.match());
     }
 
     @Test
@@ -97,16 +98,16 @@ class SearchEngineTest {
       Excerpt excerpt = firstExcerptOf("TERM", before + "TERM" + after);
 
       // 40 chars kept on each side, the extra 5 dropped, ellipsis on both ends.
-      assertTrue(excerpt.snippet().startsWith("…"), excerpt.snippet());
-      assertTrue(excerpt.snippet().endsWith("…"), excerpt.snippet());
-      assertEquals("TERM", excerpt.snippet().substring(excerpt.matchStart(), excerpt.matchEnd()));
+      assertTrue(excerpt.render(Function.identity()).startsWith("…"), excerpt.render(Function.identity()));
+      assertTrue(excerpt.render(Function.identity()).endsWith("…"), excerpt.render(Function.identity()));
+      assertEquals(new SearchTerm("TERM"), excerpt.match());
     }
 
     @Test
     void doesNotAddEllipsisWhenContextFitsWithinBounds() {
       Excerpt excerpt = firstExcerptOf("world", "hello world");
 
-      assertTrue(!excerpt.snippet().startsWith("…") && !excerpt.snippet().endsWith("…"));
+      assertTrue(!excerpt.render(Function.identity()).startsWith("…") && !excerpt.render(Function.identity()).endsWith("…"));
     }
 
     @ParameterizedTest(name = "flattens {0}")
@@ -114,8 +115,8 @@ class SearchEngineTest {
     void flattensWhitespaceToStayOnOneLine(String whitespace) {
       Excerpt excerpt = firstExcerptOf("term", "before" + whitespace + "term" + whitespace + "after");
 
-      assertTrue(!excerpt.snippet().contains(whitespace), excerpt.snippet());
-      assertEquals("term", excerpt.snippet().substring(excerpt.matchStart(), excerpt.matchEnd()));
+      assertFalse(excerpt.render(Function.identity()).contains(whitespace), excerpt.render(Function.identity()));
+      assertEquals(new SearchTerm("term"), excerpt.match());
     }
   }
 }

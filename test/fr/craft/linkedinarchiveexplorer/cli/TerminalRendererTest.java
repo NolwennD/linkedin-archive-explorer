@@ -26,8 +26,8 @@ class TerminalRendererTest {
     return new SearchResults(List.of(group));
   }
 
-  private static Excerpt excerpt(String snippet, int start, int end) {
-    return new Excerpt(snippet, start, end);
+  private static Excerpt excerpt(String before, String match, String after) {
+    return new Excerpt(before, new SearchTerm(match), after);
   }
 
   @Test
@@ -47,7 +47,7 @@ class TerminalRendererTest {
       String output =
           renderer.render(
               new SearchTerm("foo"),
-              oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a foo b", 2, 5)));
+              oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a ", "foo", " b")));
 
       assertTrue(output.contains("COMMENTS"), output);
       assertTrue(output.contains("[2024-11-06]"), output);
@@ -60,7 +60,7 @@ class TerminalRendererTest {
       String output =
           renderer.render(
               new SearchTerm("foo"),
-              oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a foo b", 2, 5)));
+              oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a ", "foo", " b")));
 
       assertFalse(output.contains(ESC), "plain output must not contain ANSI/OSC escapes");
     }
@@ -75,7 +75,7 @@ class TerminalRendererTest {
     void wrapsTheMatchWithAnsiHighlight() {
       String output =
           renderer.render(
-              new SearchTerm("foo"), oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a foo b", 2, 5)));
+              new SearchTerm("foo"), oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a ", "foo", " b")));
 
       // The whole snippet must be rendered intact — only the match wrapped, nothing duplicated.
       String highlightedSnippet = "a " + ESC + "[1;33m" + "foo" + ESC + "[0m" + " b";
@@ -86,7 +86,7 @@ class TerminalRendererTest {
     void embedsAnOsc8HyperlinkToTheUrl() {
       String output =
           renderer.render(
-              new SearchTerm("foo"), oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a foo b", 2, 5)));
+              new SearchTerm("foo"), oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a ", "foo", " b")));
 
       assertTrue(output.contains(ESC + "]8;;https://li/1" + ESC + "\\"), output);
     }
@@ -100,7 +100,7 @@ class TerminalRendererTest {
       Content article = new Content(ContentType.ARTICLE, Optional.empty(), "https://li/a", "text");
       SearchResults results =
           new SearchResults(
-              List.of(new ContentGroup(ContentType.ARTICLE, List.of(new SearchHit(article, List.of(excerpt("x foo", 2, 5)))))));
+              List.of(new ContentGroup(ContentType.ARTICLE, List.of(new SearchHit(article, List.of(excerpt("x ", "foo", "")))))));
 
       String output = new TerminalRenderer(false).render(new SearchTerm("foo"), results);
 

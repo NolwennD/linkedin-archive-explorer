@@ -3,6 +3,7 @@ package fr.craft.linkedinarchiveexplorer.infrastructure;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import fr.craft.linkedinarchiveexplorer.domain.Body;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import java.time.LocalDate;
@@ -28,7 +29,7 @@ class ContentSourcesTest {
       Content comment = contents.get(0);
       assertEquals(ContentType.COMMENT, comment.type());
       assertEquals("https://li/1", comment.url());
-      assertEquals("hello, world", comment.text());
+      assertEquals(new Body("hello, world"), comment.text());
       assertEquals(LocalDate.of(2024, 11, 6), comment.date().orElseThrow());
     }
 
@@ -54,7 +55,7 @@ class ContentSourcesTest {
       Content post = contents.get(0);
       assertEquals(ContentType.POST, post.type());
       assertEquals("https://li/post", post.url());
-      assertEquals("my post", post.text());
+      assertEquals(new Body("my post"), post.text());
       assertEquals(LocalDate.of(2024, 1, 2), post.date().orElseThrow());
     }
   }
@@ -83,7 +84,7 @@ class ContentSourcesTest {
       assertEquals(ContentType.ARTICLE, article.type());
       assertEquals("https://www.linkedin.com/pulse/my-article", article.url());
       assertTrue(article.date().isEmpty());
-      assertTrue(article.text().contains("kotlin"), article.text());
+      assertTrue(article.text().value().contains("kotlin"), article.text().value());
     }
   }
 }

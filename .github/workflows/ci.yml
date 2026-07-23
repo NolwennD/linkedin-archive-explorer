@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref (e.g. new pushes to a PR).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (JDK ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # 17 = the declared floor (catches accidental use of newer APIs), 21 = current LTS.
+        java: ['17', '25']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      # Pure JDK, no build tool: bin/test is a JEP 330 single-file program that does the
+      # modular compile (architecture enforcement) then compiles and runs the tests on the
+      # classpath with the vendored JUnit console jar. Invoked directly so it needs neither
+      # the executable bit nor `env -S`.
+      - name: Run tests
+        run: java --source 17 bin/test

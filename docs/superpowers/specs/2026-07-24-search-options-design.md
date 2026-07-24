@@ -115,21 +115,26 @@ linkedin-archive-explorer -i -w "post"
 On garde le style **explicite, écrit à la main** (pas de `java.util.regex`). On remplace
 `value.indexOf(needle)` par un balayage fondé sur `String.regionMatches` :
 
+Aucune branche `if` sur les options dans le moteur : ce sont les **enums qui agissent**
+(voir §5). Le balayage délègue à `caseSensitivity` la comparaison et à `wordScope` le
+test de frontière :
+
 ```
 pour at de 0 à texte.length() - needle.length() :
-    si texte.regionMatches(ignoreCase, at, needle, 0, needle.length())
-       et (!motEntier || frontièreOk(texte, at, at + needle.length())) :
+    si caseSensitivity.matchesAt(texte, at, needle)
+       et wordScope.allows(texte, at, at + needle.length()) :
         enregistrer le match [at, at + needle.length())
         at += needle.length()      // occurrences non chevauchantes
 ```
 
-- **Insensibilité à la casse** : fournie directement — et **correctement** — par
-  `regionMatches(true, …)`. La comparaison se fait caractère par caractère et **ne
-  modifie jamais la longueur**, contrairement à `toLowerCase()` (`ß`→`ss`, `İ`→2
-  caractères). La zone matchée fait donc **toujours exactement** `needle.length()`
-  caractères.
-- **`frontièreOk`** applique la règle de §2 (voisins dans le texte uniquement),
-  avec `isWordChar(c) = Character.isLetterOrDigit(c) || c == '_'`.
+- **Insensibilité à la casse** : `caseSensitivity.matchesAt(...)` s'appuie sur
+  `String.regionMatches` (`SENSITIVE` → `ignoreCase=false`, `INSENSITIVE` → `true`).
+  La comparaison se fait caractère par caractère et **ne modifie jamais la longueur**,
+  contrairement à `toLowerCase()` (`ß`→`ss`, `İ`→2 caractères). La zone matchée fait
+  donc **toujours exactement** `needle.length()` caractères.
+- **Frontière** : `wordScope.allows(...)` applique la règle de §2 (`ANYWHERE` → toujours
+  vrai ; `WHOLE_WORD` → voisins dans le texte non-mots), avec
+  `isWordChar(c) = Character.isLetterOrDigit(c) || c == '_'`.
 
 **Conséquence importante** : la zone matchée est le **texte réel de la source** (sa vraie
 casse), qui peut différer du terme recherché avec `-i`. L'extrait surligne donc le texte
@@ -137,9 +142,26 @@ matché, **pas** le terme — c'est le rôle du type `Match` (§5).
 
 ## 5. Modèle de domaine
 
-- Deux **enums** plutôt que des booléens (principe « éviter les primitifs » du projet) :
-  - `CaseSensitivity { SENSITIVE, INSENSITIVE }`
-  - `WordScope { ANYWHERE, WHOLE_WORD }`
+- Deux **enums porteurs de comportement** plutôt que des booléens (éviter les primitifs
+  **et** Tell-Don't-Ask : l'enum sait faire, le moteur ne teste rien).
+  - `CaseSensitivity { SENSITIVE, INSENSITIVE }` avec
+    `boolean matchesAt(String text, int at, String needle)` — chaque valeur appelle
+    `text.regionMatches(ignoreCase, at, needle, 0, needle.length())` avec son propre
+    `ignoreCase`.
+  - `WordScope { ANYWHERE, WHOLE_WORD }` avec `boolean allows(String text, int start, int end)`
+    — `ANYWHERE` renvoie toujours `true` ; `WHOLE_WORD` vérifie que les voisins dans le
+    texte ne sont pas des caractères de mot. Le helper `isWordChar` est privé à l'enum.
+  ```java
+  enum WordScope {
+    ANYWHERE   { boolean allows(String t, int start, int end) { return true; } },
+    WHOLE_WORD { boolean allows(String t, int start, int end) {
+                   return freeAt(t, start - 1) && freeAt(t, end); } };
+    abstract boolean allows(String t, int start, int end);
+    private static boolean freeAt(String t, int i) {
+      return i < 0 || i >= t.length() || !isWordChar(t.charAt(i));
+    }
+  }
+  ```
 - Nouveau **type `Match`** — un fragment de source **localisé** : sa position dans le
   texte **et** le texte réellement trouvé. C'est l'unité que l'on surligne.
   ```java
@@ -192,6 +214,8 @@ Nouveaux groupes `@Nested` (dans `SearchEngineTest` ou un `SearchTermTest` dédi
   bords de texte sont des frontières ; `_` et lettres accentuées n'en sont pas ; le cas
   de référence `-w "Date"` matche dans `Date(0,0,0)`.
 - **Combined** `-i -w`, et **défaut inchangé** (littéral, sensible casse + accents).
+- Le comportement des enums (`WordScope.allows`, `CaseSensitivity.matchesAt`) est
+  testable en isolation ; on privilégie néanmoins des tests sociables via `SearchTerm`.
 - Mise à jour des tests `Excerpt` / `Body` pour le passage de `match` au type `Match`
   (position + fragment réel), + validation du compact constructor de `Match`.
 - Tests de parsing d'arguments dans `Main` pour les nouveaux flags (si cette couverture

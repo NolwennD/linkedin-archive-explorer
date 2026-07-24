@@ -133,13 +133,21 @@ pour at de 0 à texte.length() - needle.length() :
 
 **Conséquence importante** : la zone matchée est le **texte réel de la source** (sa vraie
 casse), qui peut différer du terme recherché avec `-i`. L'extrait surligne donc le texte
-matché, **pas** le terme.
+matché, **pas** le terme — c'est le rôle du type `Match` (§5).
 
 ## 5. Modèle de domaine
 
 - Deux **enums** plutôt que des booléens (principe « éviter les primitifs » du projet) :
   - `CaseSensitivity { SENSITIVE, INSENSITIVE }`
   - `WordScope { ANYWHERE, WHOLE_WORD }`
+- Nouveau **type `Match`** — un fragment de source **localisé** : sa position dans le
+  texte **et** le texte réellement trouvé. C'est l'unité que l'on surligne.
+  ```java
+  record Match(int start, int end, String value)
+  ```
+  Compact constructor : `value` non nul, `0 <= start <= end`, et invariant
+  `value.length() == end - start`. `value` est le fragment réel de la source (sa vraie
+  casse, potentiellement différente du terme avec `-i`).
 - `SearchTerm` porte ces options et **possède la recherche** (Tell-Don't-Ask : le terme
   sait se trouver lui-même) :
   ```java
@@ -149,17 +157,16 @@ matché, **pas** le terme.
   ```
   Le compact constructor valide `value` (non nul, non blank) et les options (non nulles).
   Le factory `literal(...)` garde les appels par défaut concis (tests, cas usuel).
-- Nouveau `record Match(int start, int end)` (validé : `0 <= start <= end`).
-- `Excerpt` ne stocke plus un `SearchTerm` mais le **texte matché réel** sous forme de
-  `String` :
+- `Excerpt` ne stocke plus un `SearchTerm` mais le **`Match`** qu'il entoure :
   ```java
-  record Excerpt(String before, String match, String after)
-      String render(Function<String,String> emphasis)  // before + emphasis(match) + after
+  record Excerpt(String before, Match match, String after)
+      String render(Function<String,String> emphasis)  // before + emphasis(match.value()) + after
   ```
 
 `Body.excerptsFor(term)` délègue la localisation à `term.occurrencesIn(value)` et ne
-garde que son vrai rôle : construire la fenêtre de contexte (±40 caractères, sauts de
-ligne aplatis, ellipses) et extraire le texte matché de chaque `Match`.
+garde que son vrai rôle : à partir de chaque `Match` (`start`/`end`), construire la
+fenêtre de contexte (±40 caractères, sauts de ligne aplatis, ellipses) autour du
+fragment.
 
 `SearchEngine`, `SearchContentsService`, `SearchResults` : **signatures inchangées**,
 elles transportent simplement le `SearchTerm` enrichi.
@@ -185,6 +192,7 @@ Nouveaux groupes `@Nested` (dans `SearchEngineTest` ou un `SearchTermTest` dédi
   bords de texte sont des frontières ; `_` et lettres accentuées n'en sont pas ; le cas
   de référence `-w "Date"` matche dans `Date(0,0,0)`.
 - **Combined** `-i -w`, et **défaut inchangé** (littéral, sensible casse + accents).
-- Mise à jour des tests `Excerpt` / `Body` pour le passage de `match` en `String`.
+- Mise à jour des tests `Excerpt` / `Body` pour le passage de `match` au type `Match`
+  (position + fragment réel), + validation du compact constructor de `Match`.
 - Tests de parsing d'arguments dans `Main` pour les nouveaux flags (si cette couverture
   existe déjà).

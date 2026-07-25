@@ -5,9 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A command-line tool to **explore a LinkedIn data export**. It runs a literal,
-grep-style search (case- and accent-sensitive) over the user's **comments, posts and
-articles** and prints the matches grouped by type, newest first, with clickable
-LinkedIn links and ~40 characters of context around each occurrence.
+grep-style search (case- and accent-sensitive by default) over the user's **comments,
+posts and articles** and prints the matches grouped by type, newest first, with clickable
+LinkedIn links and ~40 characters of context around each occurrence. Two grep-style
+options relax the match: `-i`/`--ignore-case` (case-insensitive, accents still
+significant) and `-w`/`--word` (whole word only). See
+[docs/superpowers/specs/2026-07-24-search-options-design.md](docs/superpowers/specs/2026-07-24-search-options-design.md).
 
 Full design and the rationale behind every decision:
 [docs/superpowers/specs/2026-07-22-linkedin-archive-explorer-design.md](docs/superpowers/specs/2026-07-22-linkedin-archive-explorer-design.md).
@@ -40,7 +43,7 @@ for Windows.
   `java -jar lib/junit-platform-console-standalone-*.jar execute -cp "out-test:$(find out -mindepth 1 -maxdepth 1 -type d | tr '\n' ':')" --select-class fr.craft.linkedinarchiveexplorer.domain.SearchEngineTest`
 - **Build the CLI**: `./bin/build` — modular compile (enforcement) then packages every
   layer into `dist/linkedin-explorer.jar`. (Windows: `bin\build.cmd`.)
-- **Run the CLI**: `./linkedin-archive-explorer [--archive <path>] [--color|--no-color] <term>`
+- **Run the CLI**: `./linkedin-archive-explorer [--archive <path>] [--color|--no-color] [-i|--ignore-case] [-w|--word] <term>`
   — builds the jar on first use; equivalently `java -jar dist/linkedin-explorer.jar …`.
   (default archive: most recent `.zip` in `data/`).
 

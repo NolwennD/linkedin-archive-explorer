@@ -13,6 +13,14 @@ public enum CaseSensitivity {
     boolean matchesAt(String text, int at, String needle) {
       return text.regionMatches(false, at, needle, 0, needle.length());
     }
+  },
+
+  /** {@code date} matches {@code Date} and {@code DATE}; accents stay significant. */
+  INSENSITIVE {
+    @Override
+    boolean matchesAt(String text, int at, String needle) {
+      return text.regionMatches(true, at, needle, 0, needle.length());
+    }
   };
 
   /**

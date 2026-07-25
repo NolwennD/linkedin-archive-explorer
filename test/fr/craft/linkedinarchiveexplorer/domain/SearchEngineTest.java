@@ -24,6 +24,16 @@ class SearchEngineTest {
     return ENGINE.search(SearchTerm.literal(term), List.of(contents));
   }
 
+  private static List<SearchHit> searchIgnoringCase(String term, Content... contents) {
+    SearchTerm searchTerm = new SearchTerm(term, CaseSensitivity.INSENSITIVE, WordScope.ANYWHERE);
+    return ENGINE.search(searchTerm, List.of(contents));
+  }
+
+  private static List<SearchHit> searchWholeWord(String term, Content... contents) {
+    SearchTerm searchTerm = new SearchTerm(term, CaseSensitivity.SENSITIVE, WordScope.WHOLE_WORD);
+    return ENGINE.search(searchTerm, List.of(contents));
+  }
+
   @Nested
   class Matching {
 
@@ -52,6 +62,60 @@ class SearchEngineTest {
       // matches the other.
       assertTrue(search("café", comment("café")).isEmpty(), "NFC term must not match NFD text");
       assertTrue(search("café", comment("café")).isEmpty(), "NFD term must not match NFC text");
+    }
+  }
+
+  @Nested
+  class CaseInsensitive {
+
+    @Test
+    void findsAnOccurrenceRegardlessOfCase() {
+      assertEquals(1, searchIgnoringCase("date", comment("the Date here")).size());
+      // the literal (case-sensitive) search must NOT find it — the option makes the difference
+      assertTrue(search("date", comment("the Date here")).isEmpty());
+    }
+
+    @Test
+    void highlightsTheRealCaseOfTheText() {
+      List<SearchHit> hits = searchIgnoringCase("date", comment("the DATE format"));
+
+      assertEquals(new Match(4, 8, "DATE"), hits.get(0).excerpts().get(0).match());
+    }
+
+    @Test
+    void staysSensitiveToAccents() {
+      assertTrue(searchIgnoringCase("developpe", comment("je développe")).isEmpty());
+    }
+  }
+
+  @Nested
+  class WholeWord {
+
+    @ParameterizedTest(name = "matches whole word: {1}")
+    @CsvSource({
+      "dev, un dev senior,        surrounded by spaces",
+      "dev, 'le dev, ici',        followed by punctuation",
+      "dev, dev,                  the whole text is the word",
+      "Date, bug Date(0000) here, followed by a parenthesis"
+    })
+    void acceptsAnOccurrenceThatFormsAWholeWord(String term, String text, String reason) {
+      assertEquals(1, searchWholeWord(term, comment(text)).size(), reason);
+    }
+
+    @ParameterizedTest(name = "rejects partial word: {1}")
+    @CsvSource({
+      "dev, un développeur,  followed by a letter",
+      "dev, mode_dev actif,  preceded by an underscore",
+      "Date, un DateFormat,  followed by a letter"
+    })
+    void rejectsAnOccurrenceInsideALargerWord(String term, String text, String reason) {
+      assertTrue(searchWholeWord(term, comment(text)).isEmpty(), reason);
+    }
+
+    @Test
+    void treatsAccentedLettersAsWordCharacters() {
+      assertEquals(1, searchWholeWord("café", comment("un café !")).size());
+      assertTrue(searchWholeWord("café", comment("de la caféine")).isEmpty());
     }
   }
 

@@ -2,9 +2,11 @@ package fr.craft.linkedinarchiveexplorer.cli;
 
 import fr.craft.linkedinarchiveexplorer.application.SearchContentsService;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
+import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
 import fr.craft.linkedinarchiveexplorer.domain.ContentSource;
 import fr.craft.linkedinarchiveexplorer.domain.SearchEngine;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
+import fr.craft.linkedinarchiveexplorer.domain.WordScope;
 import fr.craft.linkedinarchiveexplorer.infrastructure.ArchiveLocator;
 import fr.craft.linkedinarchiveexplorer.infrastructure.ArticlesContentSource;
 import fr.craft.linkedinarchiveexplorer.infrastructure.CommentsContentSource;
@@ -52,6 +54,8 @@ public final class Main {
     Path archivePath = null;
     boolean noColor = false;
     boolean forceColor = false;
+    CaseSensitivity caseSensitivity = CaseSensitivity.SENSITIVE;
+    WordScope wordScope = WordScope.ANYWHERE;
     String term = null;
 
     for (int i = 0; i < args.length; i++) {
@@ -65,6 +69,8 @@ public final class Main {
         }
         case "--no-color" -> noColor = true;
         case "--color" -> forceColor = true;
+        case "-i", "--ignore-case" -> caseSensitivity = CaseSensitivity.INSENSITIVE;
+        case "-w", "--word" -> wordScope = WordScope.WHOLE_WORD;
         default -> {
           if (arg.startsWith("--") || term != null) {
             return usage(err);
@@ -95,7 +101,7 @@ public final class Main {
               new CommentsContentSource(zip),
               new SharesContentSource(zip),
               new ArticlesContentSource(zip, new JdkArticleTextExtractor()));
-      SearchTerm searchTerm = SearchTerm.literal(term);
+      SearchTerm searchTerm = new SearchTerm(term, caseSensitivity, wordScope);
       SearchResults results = new SearchContentsService(sources, new SearchEngine()).search(searchTerm);
       out.print(new TerminalRenderer(styled).render(searchTerm, results));
       return 0;
@@ -106,7 +112,9 @@ public final class Main {
   }
 
   private int usage(PrintStream err) {
-    err.println("usage: linkedin-archive-explorer [--archive <path>] [--color|--no-color] <term>");
+    err.println(
+        "usage: linkedin-archive-explorer [--archive <path>] [--color|--no-color]"
+            + " [-i|--ignore-case] [-w|--word] <term>");
     return 2;
   }
 }

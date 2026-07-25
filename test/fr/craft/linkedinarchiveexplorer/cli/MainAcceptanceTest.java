@@ -68,6 +68,55 @@ class MainAcceptanceTest {
   }
 
   @Test
+  void ignoreCaseFlagMatchesADifferentCase() throws IOException {
+    Path archive = archiveWithComment("about Date here");
+
+    assertEquals(0, run("--archive", archive.toString(), "-i", "date"));
+    assertTrue(out().contains("COMMENTS"), out());
+    assertTrue(out().contains("Date"), out());
+  }
+
+  @Test
+  void ignoreCaseHasALongForm() throws IOException {
+    Path archive = archiveWithComment("about Date here");
+
+    assertEquals(0, run("--archive", archive.toString(), "--ignore-case", "date"));
+    assertTrue(out().contains("COMMENTS"), out());
+  }
+
+  @Test
+  void withoutIgnoreCaseADifferentCaseIsNotFound() throws IOException {
+    Path archive = archiveWithComment("about Date here");
+
+    assertEquals(0, run("--archive", archive.toString(), "date"));
+    assertTrue(out().contains("No results"), out());
+  }
+
+  @Test
+  void wordFlagMatchesAWholeWord() throws IOException {
+    Path archive = archiveWithComment("un dev senior");
+
+    assertEquals(0, run("--archive", archive.toString(), "-w", "dev"));
+    assertTrue(out().contains("COMMENTS"), out());
+  }
+
+  @Test
+  void wordFlagRejectsAPartialWord() throws IOException {
+    Path archive = archiveWithComment("un développeur ici");
+
+    assertEquals(0, run("--archive", archive.toString(), "--word", "dev"));
+    assertTrue(out().contains("No results"), out());
+  }
+
+  @Test
+  void combinesIgnoreCaseAndWholeWord() throws IOException {
+    Path archive = archiveWithComment("un POST viral");
+
+    assertEquals(0, run("--archive", archive.toString(), "-i", "-w", "post"));
+    assertTrue(out().contains("POST"), out());
+  }
+
+  @Test
   void reportsNoResultWhenTheTermIsAbsent() throws IOException {
     Path archive = archiveWithComment("nothing relevant");
 

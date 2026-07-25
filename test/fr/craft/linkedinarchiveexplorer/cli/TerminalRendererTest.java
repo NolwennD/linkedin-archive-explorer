@@ -8,6 +8,7 @@ import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
+import fr.craft.linkedinarchiveexplorer.domain.Match;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
 import java.time.LocalDate;
@@ -27,12 +28,12 @@ class TerminalRendererTest {
   }
 
   private static Excerpt excerpt(String before, String match, String after) {
-    return new Excerpt(before, new SearchTerm(match), after);
+    return new Excerpt(before, new Match(0, match.length(), match), after);
   }
 
   @Test
   void reportsNoResultWhenEmpty() {
-    String output = new TerminalRenderer(false).render(new SearchTerm("x"), new SearchResults(List.of()));
+    String output = new TerminalRenderer(false).render(SearchTerm.literal("x"), new SearchResults(List.of()));
 
     assertTrue(output.contains("No results for \"x\""), output);
   }
@@ -46,7 +47,7 @@ class TerminalRendererTest {
     void showsHeadingDateExcerptAndRawUrl() {
       String output =
           renderer.render(
-              new SearchTerm("foo"),
+              SearchTerm.literal("foo"),
               oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a ", "foo", " b")));
 
       assertTrue(output.contains("COMMENTS"), output);
@@ -59,7 +60,7 @@ class TerminalRendererTest {
     void containsNoEscapeSequences() {
       String output =
           renderer.render(
-              new SearchTerm("foo"),
+              SearchTerm.literal("foo"),
               oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a ", "foo", " b")));
 
       assertFalse(output.contains(ESC), "plain output must not contain ANSI/OSC escapes");
@@ -75,7 +76,7 @@ class TerminalRendererTest {
     void wrapsTheMatchWithAnsiHighlight() {
       String output =
           renderer.render(
-              new SearchTerm("foo"), oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a ", "foo", " b")));
+              SearchTerm.literal("foo"), oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a ", "foo", " b")));
 
       // The whole snippet must be rendered intact — only the match wrapped, nothing duplicated.
       String highlightedSnippet = "a " + ESC + "[1;33m" + "foo" + ESC + "[0m" + " b";
@@ -86,7 +87,7 @@ class TerminalRendererTest {
     void embedsAnOsc8HyperlinkToTheUrl() {
       String output =
           renderer.render(
-              new SearchTerm("foo"), oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a ", "foo", " b")));
+              SearchTerm.literal("foo"), oneComment("https://li/1", LocalDate.of(2024, 11, 6), excerpt("a ", "foo", " b")));
 
       assertTrue(output.contains(ESC + "]8;;https://li/1" + ESC + "\\"), output);
     }
@@ -102,7 +103,7 @@ class TerminalRendererTest {
           new SearchResults(
               List.of(new ContentGroup(ContentType.ARTICLE, List.of(new SearchHit(article, List.of(excerpt("x ", "foo", "")))))));
 
-      String output = new TerminalRenderer(false).render(new SearchTerm("foo"), results);
+      String output = new TerminalRenderer(false).render(SearchTerm.literal("foo"), results);
 
       assertTrue(output.contains("ARTICLES"), output);
       assertFalse(output.contains("["), "articles have no date bracket: " + output);

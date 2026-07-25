@@ -4,10 +4,10 @@ import java.util.function.Function;
 
 /**
  * A short snippet of context around one occurrence of the searched term: the text
- * {@code before} the match, the matched {@link SearchTerm} itself, and the text
- * {@code after} — so a renderer can highlight the match without any index arithmetic.
+ * {@code before} the match, the {@link Match} itself, and the text {@code after} — so a
+ * renderer can highlight the match without any index arithmetic.
  */
-public record Excerpt(String before, SearchTerm match, String after) {
+public record Excerpt(String before, Match match, String after) {
 
   public Excerpt {
     if (before == null || match == null || after == null) {

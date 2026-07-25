@@ -29,7 +29,7 @@ class SearchContentsServiceTest {
   private static SearchResults search(String term, Content... contents) {
     SearchContentsService service =
         new SearchContentsService(List.of(new FakeContentSource(contents)), new SearchEngine());
-    return service.search(new SearchTerm(term));
+    return service.search(SearchTerm.literal(term));
   }
 
   @Test
@@ -90,7 +90,7 @@ class SearchContentsServiceTest {
                 new FakeContentSource(dated(POST, "2024-01-01", "x from source two"))),
             new SearchEngine());
 
-    SearchResults results = service.search(new SearchTerm("x"));
+    SearchResults results = service.search(SearchTerm.literal("x"));
 
     assertEquals(2, results.groups().size());
   }

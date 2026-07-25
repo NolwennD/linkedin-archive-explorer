@@ -95,7 +95,7 @@ public final class Main {
               new CommentsContentSource(zip),
               new SharesContentSource(zip),
               new ArticlesContentSource(zip, new JdkArticleTextExtractor()));
-      SearchTerm searchTerm = new SearchTerm(term);
+      SearchTerm searchTerm = SearchTerm.literal(term);
       SearchResults results = new SearchContentsService(sources, new SearchEngine()).search(searchTerm);
       out.print(new TerminalRenderer(styled).render(searchTerm, results));
       return 0;

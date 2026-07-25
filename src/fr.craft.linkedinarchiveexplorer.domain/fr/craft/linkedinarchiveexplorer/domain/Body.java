@@ -22,16 +22,16 @@ public record Body(String value) {
 
   /** One {@link Excerpt} per non-overlapping occurrence of {@code term}, in order. */
   public List<Excerpt> excerptsFor(SearchTerm term) {
-    String needle = term.value();
     List<Excerpt> excerpts = new ArrayList<>();
-    for (int at = value.indexOf(needle); at != -1; at = value.indexOf(needle, at + needle.length())) {
-      excerpts.add(excerptAt(term, at));
+    for (Match match : term.occurrencesIn(value)) {
+      excerpts.add(excerptAt(match));
     }
     return excerpts;
   }
 
-  private Excerpt excerptAt(SearchTerm term, int matchStart) {
-    int matchEnd = matchStart + term.value().length();
+  private Excerpt excerptAt(Match match) {
+    int matchStart = match.start();
+    int matchEnd = match.end();
     int windowStart = Math.max(0, matchStart - CONTEXT);
     int windowEnd = Math.min(value.length(), matchEnd + CONTEXT);
 
@@ -40,7 +40,7 @@ public record Body(String value) {
 
     String before = prefix + flatten(value.substring(windowStart, matchStart));
     String after = flatten(value.substring(matchEnd, windowEnd)) + suffix;
-    return new Excerpt(before, term, after);
+    return new Excerpt(before, match, after);
   }
 
   private static String flatten(String raw) {

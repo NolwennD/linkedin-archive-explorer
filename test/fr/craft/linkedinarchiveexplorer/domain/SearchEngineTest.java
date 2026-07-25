@@ -21,7 +21,7 @@ class SearchEngineTest {
   }
 
   private static List<SearchHit> search(String term, Content... contents) {
-    return ENGINE.search(new SearchTerm(term), List.of(contents));
+    return ENGINE.search(SearchTerm.literal(term), List.of(contents));
   }
 
   @Nested
@@ -88,7 +88,7 @@ class SearchEngineTest {
       Excerpt excerpt = firstExcerptOf("world", "hello world");
 
       assertEquals("hello world", excerpt.render(Function.identity()));
-      assertEquals(new SearchTerm("world"), excerpt.match());
+      assertEquals(new Match(6, 11, "world"), excerpt.match());
     }
 
     @Test
@@ -100,7 +100,7 @@ class SearchEngineTest {
       // 40 chars kept on each side, the extra 5 dropped, ellipsis on both ends.
       assertTrue(excerpt.render(Function.identity()).startsWith("…"), excerpt.render(Function.identity()));
       assertTrue(excerpt.render(Function.identity()).endsWith("…"), excerpt.render(Function.identity()));
-      assertEquals(new SearchTerm("TERM"), excerpt.match());
+      assertEquals(new Match(45, 49, "TERM"), excerpt.match());
     }
 
     @Test
@@ -116,7 +116,7 @@ class SearchEngineTest {
       Excerpt excerpt = firstExcerptOf("term", "before" + whitespace + "term" + whitespace + "after");
 
       assertFalse(excerpt.render(Function.identity()).contains(whitespace), excerpt.render(Function.identity()));
-      assertEquals(new SearchTerm("term"), excerpt.match());
+      assertEquals(new Match(7, 11, "term"), excerpt.match());
     }
   }
 }

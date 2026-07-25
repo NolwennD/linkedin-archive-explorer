@@ -32,6 +32,13 @@ class MatchTest {
   }
 
   @Test
+  void rejectsANegativeStartEvenWhenTheSpanLengthMatches() {
+    // start < 0 is the only violation (length invariant 0 == -1 - -1 holds), so this
+    // pins the span-check on its own rather than leaning on the length check.
+    assertThrows(IllegalArgumentException.class, () -> new Match(-1, -1, ""));
+  }
+
+  @Test
   void rejectsALengthThatDisagreesWithTheSpan() {
     // value length must equal end - start
     assertThrows(IllegalArgumentException.class, () -> new Match(0, 5, "abc"));

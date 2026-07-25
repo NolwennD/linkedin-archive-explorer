@@ -202,7 +202,9 @@ elles transportent simplement le `SearchTerm` enrichi.
 usage: linkedin-archive-explorer [--archive <path>] [--color|--no-color] [-i|--ignore-case] [-w|--word] <term>
 ```
 
-Parsing simple : `-i` et `-w` sont des tokens séparés (pas de `-iw` en v1).
+Les formes courtes se regroupent dans les deux ordres : `-iw` et `-wi` valent `-i -w`.
+Un cluster à tiret simple n'est reconnu que s'il ne contient que des lettres connues
+(`i`, `w`) ; sinon l'argument suit le traitement habituel (terme de recherche).
 
 ## 7. Tests (TDD, red → green → refactor)
 

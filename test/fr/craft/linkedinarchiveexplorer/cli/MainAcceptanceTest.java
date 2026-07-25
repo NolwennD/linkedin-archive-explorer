@@ -116,6 +116,15 @@ class MainAcceptanceTest {
     assertTrue(out().contains("POST"), out());
   }
 
+  @ParameterizedTest(name = "bundled {0} = -i -w")
+  @ValueSource(strings = {"-iw", "-wi"})
+  void bundlesShortFlagsInEitherOrder(String bundle) throws IOException {
+    Path archive = archiveWithComment("un POST viral et un repost");
+
+    assertEquals(0, run("--archive", archive.toString(), bundle, "post"));
+    assertTrue(out().contains("POST"), out());
+  }
+
   @Test
   void reportsNoResultWhenTheTermIsAbsent() throws IOException {
     Path archive = archiveWithComment("nothing relevant");

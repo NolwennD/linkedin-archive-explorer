@@ -69,13 +69,21 @@ public final class Main {
         }
         case "--no-color" -> noColor = true;
         case "--color" -> forceColor = true;
-        case "-i", "--ignore-case" -> caseSensitivity = CaseSensitivity.INSENSITIVE;
-        case "-w", "--word" -> wordScope = WordScope.WHOLE_WORD;
+        case "--ignore-case" -> caseSensitivity = CaseSensitivity.INSENSITIVE;
+        case "--word" -> wordScope = WordScope.WHOLE_WORD;
         default -> {
-          if (arg.startsWith("--") || term != null) {
+          if (isShortFlagBundle(arg)) {
+            for (int f = 1; f < arg.length(); f++) {
+              switch (arg.charAt(f)) {
+                case 'i' -> caseSensitivity = CaseSensitivity.INSENSITIVE;
+                case 'w' -> wordScope = WordScope.WHOLE_WORD;
+              }
+            }
+          } else if (arg.startsWith("--") || term != null) {
             return usage(err);
+          } else {
+            term = arg;
           }
-          term = arg;
         }
       }
     }
@@ -109,6 +117,19 @@ public final class Main {
       err.println("Error: " + failure.getMessage());
       return 1;
     }
+  }
+
+  /** A single-dash cluster of known short flags, e.g. {@code -i}, {@code -w}, {@code -iw}. */
+  private static boolean isShortFlagBundle(String arg) {
+    if (arg.length() < 2 || arg.charAt(0) != '-' || arg.charAt(1) == '-') {
+      return false;
+    }
+    for (int i = 1; i < arg.length(); i++) {
+      if (arg.charAt(i) != 'i' && arg.charAt(i) != 'w') {
+        return false;
+      }
+    }
+    return true;
   }
 
   private int usage(PrintStream err) {

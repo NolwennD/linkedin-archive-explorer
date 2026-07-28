@@ -214,5 +214,4 @@ devant `loadShares` (2,180 ms/op, 21 %) ; la somme des six étages (10,148 ms/op
 proche de `endToEnd` (10,549 ms/op), l'écart de 0,401 ms/op restant de l'information
 (allocation partagée, GC) plutôt qu'un défaut du harnais. `search`, bien qu'opérant
 entièrement en mémoire sur des contenus déjà chargés, n'est pas négligeable (1,900 ms/op,
-18 % de `endToEnd`) — un futur effort d'optimisation aurait donc autant à gagner côté
-moteur de recherche que côté chargeurs CSV.
+18 % de `endToEnd`) ; mais les trois chargeurs réunis pèsent 78 %, et c'est donc là que se joue l'essentiel du temps.

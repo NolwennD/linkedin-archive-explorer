@@ -596,7 +596,10 @@ public class PipelineBenchmark {
     return shares.load();
   }
 
-  /** The heaviest source: CSV plus HTML extraction through JdkArticleTextExtractor. */
+  /**
+   * CSV plus HTML extraction through JdkArticleTextExtractor. Its rank among the load*
+   * benchmarks tracks the archive's article count, not the per-article cost.
+   */
   @Benchmark
   public List<Content> loadArticles() {
     return articles.load();

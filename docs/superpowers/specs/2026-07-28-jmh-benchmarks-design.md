@@ -191,3 +191,28 @@ référence absolue. `benchmark/results/` est horodaté pour cela.
 - **Pas d'archive de test dédiée.** On mesure sur l'archive réelle de `data/`, déjà
   gitignorée. Cohérent avec la décision « fixtures inline » du projet : aucun jeu de
   données versionné.
+
+## 9. Résultats de référence
+
+_Mesuré le 2026-07-28. JDK 26.0.1 (Temurin-26.0.1+8), Linux 7.0.0-28-generic, archive de
+699 907 octets._
+_Ces chiffres ne sont pas portables (§7) : ils servent de point de comparaison
+avant/après sur ce poste, pas de référence absolue._
+
+| Benchmark | Score (ms/op) | Erreur |
+|---|---|---|
+| `endToEnd` | 10,549 | ± 0,484 |
+| `openArchive` | 0,015 | ± 0,001 |
+| `loadComments` | 5,839 | ± 0,305 |
+| `loadShares` | 2,180 | ± 0,142 |
+| `loadArticles` | 0,171 | ± 0,006 |
+| `search` | 1,900 | ± 0,076 |
+| `render` | 0,043 | ± 0,003 |
+
+**Lecture :** `loadComments` domine largement (5,839 ms/op, 55 % de `endToEnd`), loin
+devant `loadShares` (2,180 ms/op, 21 %) ; la somme des six étages (10,148 ms/op) est
+proche de `endToEnd` (10,549 ms/op), l'écart de 0,401 ms/op restant de l'information
+(allocation partagée, GC) plutôt qu'un défaut du harnais. `search`, bien qu'opérant
+entièrement en mémoire sur des contenus déjà chargés, n'est pas négligeable (1,900 ms/op,
+18 % de `endToEnd`) — un futur effort d'optimisation aurait donc autant à gagner côté
+moteur de recherche que côté chargeurs CSV.

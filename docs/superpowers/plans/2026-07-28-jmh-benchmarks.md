@@ -249,9 +249,15 @@ public final class Bench {
         "java",
         "-cp", OUT + File.pathSeparator + jmh + File.pathSeparator + moduleCp,
         "org.openjdk.jmh.Main"));
+    // Two independent guards: supplying one of these must not silently drop the other.
+    // (JMH's own defaults would otherwise write jmh-result.csv at the project root,
+    // which is not gitignored.)
     List<String> forwarded = List.of(args);
-    if (!forwarded.contains("-rf") && !forwarded.contains("-rff")) {
-      command.addAll(List.of("-rf", "json", "-rff", RESULTS.resolve(timestamp() + ".json").toString()));
+    if (!forwarded.contains("-rf")) {
+      command.addAll(List.of("-rf", "json"));
+    }
+    if (!forwarded.contains("-rff")) {
+      command.addAll(List.of("-rff", RESULTS.resolve(timestamp() + ".json").toString()));
     }
     command.addAll(forwarded);
 
@@ -435,10 +441,14 @@ PipelineBenchmark.endToEnd   avgt    2  xx,xxx          ms/op
 
 **Si `Unable to find the resource: /META-INF/BenchmarkList`** : le processeur d'annotations n'a pas tourné — vérifier que `-processorpath` pointe bien sur les jars et que `jmh-generator-annprocess` est présent dans `benchmark/lib/`.
 
-**Si JMH refuse de démarrer sur le JDK 26** de `mise.toml` : relancer sous le JDK 17 plancher, par exemple
+**Si JMH refuse de démarrer sur le JDK 26** de `mise.toml` : relancer sous le JDK 17
+plancher. `JAVA_HOME` **n'a aucun effet ici** — le shebang `#!/usr/bin/env -S java
+--source 17` résout `java` depuis le `PATH`, et le `ProcessBuilder("java", …)` du lanceur
+fait de même ; il faut donc préfixer le `PATH`, pas positionner `JAVA_HOME` :
 
 ```bash
-JAVA_HOME=$(mise where java@17) ./benchmark/bench -f 1 -wi 1 -i 2 endToEnd
+mise install java@17   # si pas déjà installé — absent par défaut sur ce poste
+PATH="$(mise where java@17)/bin:$PATH" ./benchmark/bench -f 1 -wi 1 -i 2 endToEnd
 ```
 
 et noter le repli pour la Task 4.
@@ -537,6 +547,11 @@ public class PipelineBenchmark {
   private List<Content> contents;
   private SearchResults results;
 
+  /**
+   * Prepares state for all seven benchmarks — the load, search and grouping done here is
+   * unused by {@code openArchive} and {@code endToEnd}. Runs once per trial, outside any
+   * measured region.
+   */
   @Setup(Level.Trial)
   public void setUp() {
     archive = ArchiveLocator.mostRecent(ARCHIVE_DIR).orElseThrow(() ->
@@ -552,12 +567,12 @@ public class PipelineBenchmark {
     contents = List.of(comments, shares, articles).stream()
         .flatMap(source -> source.load().stream())
         .toList();
-    results = SearchResults.from(new SearchEngine().search(term, contents));
-
     // Fail loudly rather than measure emptiness.
     if (contents.isEmpty()) {
       throw new IllegalStateException("Archive loaded no content at all: " + archive);
     }
+
+    results = SearchResults.from(new SearchEngine().search(term, contents));
     if (results.groups().isEmpty()) {
       throw new IllegalStateException(
           "Term '" + TERM + "' matches nothing — pick a term present in the archive");

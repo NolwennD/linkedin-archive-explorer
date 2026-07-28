@@ -46,6 +46,11 @@ for Windows.
 - **Run the CLI**: `./linkedin-archive-explorer [--archive <path>] [--color|--no-color] [-i|--ignore-case] [-w|--word] <term>`
   — builds the jar on first use; equivalently `java -jar dist/linkedin-explorer.jar …`.
   (default archive: most recent `.zip` in `data/`).
+- **Run performance benchmarks**: `./benchmark/bench` — the JMH harness is **not in the
+  repository** (gitignored); rebuild it first per
+  [docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md](docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md)
+  and [docs/superpowers/plans/2026-07-28-jmh-benchmarks.md](docs/superpowers/plans/2026-07-28-jmh-benchmarks.md)
+  (the latter holds the actual source).
 
 ## Architecture
 

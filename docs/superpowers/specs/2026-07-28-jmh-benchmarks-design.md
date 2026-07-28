@@ -37,7 +37,10 @@ vraies** et n'ont pas à être amendées.
 | « Maven only as a one-off downloader » | Exception déjà admise, réutilisée telle quelle |
 
 Le prix à payer : après un clone, les benchmarks n'existent pas. Ce document est la
-recette pour les remonter.
+recette pour les remonter. Le code source lui-même — `benchmark/bench` et
+`PipelineBenchmark.java` — n'est pas ici : il vit dans
+[`../plans/2026-07-28-jmh-benchmarks.md`](../plans/2026-07-28-jmh-benchmarks.md), seule
+copie versionnée.
 
 ## 3. Arborescence
 
@@ -109,7 +112,11 @@ Environ 3 Mo au total. Les deux transitives ne sont pas nommées explicitement :
 
 ```bash
 mvn -f benchmark/pom.xml dependency:copy-dependencies -DoutputDirectory=lib
+chmod +x benchmark/bench
 ```
+
+Le lanceur doit être exécutable : sans le `chmod +x`, `./benchmark/bench` échoue avec
+« Permission denied » après un rebuild.
 
 Opération one-off. Le `pom.xml` n'est **jamais** utilisé pour compiler ou lancer quoi que
 ce soit — c'est un manifeste de téléchargement, rien d'autre. `benchmark/bench` échoue
@@ -214,4 +221,4 @@ devant `loadShares` (2,180 ms/op, 21 %) ; la somme des six étages (10,148 ms/op
 proche de `endToEnd` (10,549 ms/op), l'écart de 0,401 ms/op restant de l'information
 (allocation partagée, GC) plutôt qu'un défaut du harnais. `search`, bien qu'opérant
 entièrement en mémoire sur des contenus déjà chargés, n'est pas négligeable (1,900 ms/op,
-18 % de `endToEnd`) ; mais les trois chargeurs réunis pèsent 78 %, et c'est donc là que se joue l'essentiel du temps.
+18 % de `endToEnd`) ; mais les trois chargeurs réunis pèsent 78 %, et c'est donc là que se joue l'essentiel du temps. Une partie de cet écart de 0,401 ms/op est aussi du travail non mesuré et connu : `SearchResults.from`, l'étape de filtre-et-tri par `ContentType` que `Main.run` exécute entre la recherche et le rendu, n'a pas son propre benchmark.

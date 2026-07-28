@@ -13,3 +13,8 @@ test-data/anonymized/
 # ide/setup-intellij.sh (or .cmd) to generate .idea/ and the root .iml.
 .idea/
 /linkedin-archive-explorer.iml
+
+# Harnais de performance JMH : entièrement hors dépôt (jars, sources, résultats).
+# La recette pour le remonter après un clone est dans
+# docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md
+benchmark/

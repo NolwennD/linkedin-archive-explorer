@@ -1,80 +1,82 @@
-# Tests de performance JMH — Plan d'implémentation
+# JMH performance benchmarks — Implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Mesurer le pipeline complet de l'outil (dézip → CSV → HTML → recherche → rendu) sur l'archive réelle de `data/`, avec un chiffre bout-en-bout et une décomposition par étage.
+**Goal:** Measure the tool's whole pipeline (unzip → CSV → HTML → search → render) against the real archive in `data/`, producing one end-to-end figure and a stage-by-stage breakdown.
 
-**Architecture:** Tout le harnais vit dans un dossier `benchmark/` **gitignoré**, avec son propre lanceur JEP 330 sur le modèle de `bin/test`. JMH est utilisé comme processeur d'annotations `javac` + un `main()`, sans aucun build tool. Les benchmarks sont compilés sur le classpath (comme les tests), ce qui donne accès au package-private `Main.run`.
+**Architecture:** The entire harness lives in a **gitignored** `benchmark/` directory, with its own JEP 330 launcher modelled on `bin/test`. JMH is used as a `javac` annotation processor plus a `main()`, with no build tool involved. The benchmarks compile on the classpath (as the tests do), which is what grants access to the package-private `Main.run`.
 
-**Tech Stack:** JDK 17+ (`javac`, `java`, `ToolProvider`), JMH 1.37, Maven en téléchargeur one-off uniquement.
+**Tech Stack:** JDK 17+ (`javac`, `java`, `ToolProvider`), JMH 1.37, Maven as a one-off downloader only.
 
-**Spec de référence :** [`docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md`](../specs/2026-07-28-jmh-benchmarks-design.md)
+**Reference spec:** [`docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md`](../specs/2026-07-28-jmh-benchmarks-design.md)
 
 ## Global Constraints
 
-- **Runtime JDK-only** : rien de ce plan n'entre dans `dist/linkedin-explorer.jar`. Le code de `src/` n'est **pas modifié**.
-- **Zéro build tool** : Maven est utilisé exactement une fois, pour `dependency:copy-dependencies`. Jamais pour compiler, jamais pour lancer.
-- **Java 17 est le plancher** : le lanceur est déclaré `java --source 17`, comme `bin/test` et `bin/build`.
-- **`benchmark/` est intégralement gitignoré** : un seul commit dans tout ce plan (Task 1). Les tâches 2 et 3 ne produisent **rien de committable** — c'est voulu, ne pas forcer de `git add`.
-- **Les scripts se lancent depuis la racine du projet** : tous les chemins sont relatifs à la racine, comme `bin/test`.
-- **Imports explicites, pas de wildcard** — convention du dépôt.
-- **Text blocks uniquement s'ils le méritent** : littéral multi-ligne ou contenant des caractères pénibles à échapper (règle du `CLAUDE.md`).
+- **JDK-only runtime**: nothing in this plan enters `dist/linkedin-explorer.jar`. The code under `src/` is **not modified**.
+- **Zero build tool**: Maven is used exactly once, for `dependency:copy-dependencies`. Never to compile, never to run.
+- **Java 17 is the floor**: the launcher is declared `java --source 17`, like `bin/test` and `bin/build`.
+- **`benchmark/` is entirely gitignored**: one single commit in the whole plan (Task 1). Tasks 2 and 3 produce **nothing committable** — that is intended, do not force a `git add`.
+- **Scripts run from the project root**: every path is relative to it, as in `bin/test`.
+- **Explicit imports, no wildcards** — repository convention.
+- **Text blocks only when they earn it**: multi-line literals, or literals holding characters that are awkward to escape (the `CLAUDE.md` rule).
 
 ## File Structure
 
-| Fichier | Responsabilité | Versionné ? |
+| File | Responsibility | Versioned? |
 |---|---|---|
-| `.gitignore` | Ajoute la ligne `benchmark/` | ✅ oui |
-| `benchmark/pom.xml` | Manifeste de téléchargement des jars. Rien d'autre. | ❌ |
-| `benchmark/bench` | Lanceur JEP 330 : compile la prod, compile les benchmarks, lance JMH | ❌ |
-| `benchmark/bench.cmd` | Shim Windows d'une ligne | ❌ |
-| `benchmark/src/fr/craft/linkedinarchiveexplorer/cli/PipelineBenchmark.java` | Les 7 mesures | ❌ |
-| `docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md` | Reçoit une §9 « résultats de référence » en Task 4 | ✅ oui |
+| `.gitignore` | Adds the `benchmark/` line | ✅ yes |
+| `benchmark/pom.xml` | Jar download manifest. Nothing else. | ❌ |
+| `benchmark/bench` | JEP 330 launcher: compiles production, compiles the benchmarks, runs JMH | ❌ |
+| `benchmark/bench.cmd` | One-line Windows shim | ❌ |
+| `benchmark/src/fr/craft/linkedinarchiveexplorer/cli/PipelineBenchmark.java` | The 7 measurements | ❌ |
+| `docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md` | Gains a §9 "reference results" in Task 4 | ✅ yes |
 
-**Note sur la duplication :** `benchmark/bench` recopie cinq helpers de `bin/test` (`runTool`, `javaFiles`, `concat`, `deleteRecursively`, `moduleOutputClasspath`). C'est assumé : `bin/test` est versionné, `benchmark/bench` ne l'est pas — les factoriser créerait une dépendance d'un fichier committé vers un fichier absent au clone.
+**On the duplication:** `benchmark/bench` copies five helpers from `bin/test` (`runTool`, `javaFiles`, `concat`, `deleteRecursively`, `moduleOutputClasspath`). This is deliberate: `bin/test` is versioned, `benchmark/bench` is not — factoring them out would make a committed file depend on one that is absent on a fresh clone.
 
 ---
 
-### Task 1 : Ignorer `benchmark/` et télécharger les jars JMH
+### Task 1: Ignore `benchmark/` and download the JMH jars
 
 **Files:**
 - Modify: `.gitignore`
 - Create: `benchmark/pom.xml`
-- Create (téléchargé) : `benchmark/lib/*.jar`
+- Create (downloaded): `benchmark/lib/*.jar`
 
 **Interfaces:**
-- Consumes: rien.
-- Produces: `benchmark/lib/` contenant 4 jars, dont `jmh-core-1.37.jar` et `jmh-generator-annprocess-1.37.jar`. Task 2 construit son classpath en listant ce répertoire.
+- Consumes: nothing.
+- Produces: `benchmark/lib/` holding 4 jars, among them `jmh-core-1.37.jar` and `jmh-generator-annprocess-1.37.jar`. Task 2 builds its classpath by listing that directory.
 
-- [ ] **Step 1 : Ajouter la ligne au `.gitignore`**
+- [ ] **Step 1: Add the line to `.gitignore`**
 
-Ajouter à la fin de `.gitignore` :
+Append to `.gitignore`:
 
 ```gitignore
 
 # Harnais de performance JMH : entièrement hors dépôt (jars, sources, résultats).
 # La recette pour le remonter après un clone est dans
-# docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md
+# docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md (le contexte) et
+# docs/superpowers/plans/2026-07-28-jmh-benchmarks.md (la source, seule copie versionnée
+# de bench et PipelineBenchmark.java).
 benchmark/
 ```
 
-- [ ] **Step 2 : Vérifier que l'ignore fonctionne avant de créer quoi que ce soit**
+- [ ] **Step 2: Check the ignore works before creating anything**
 
 ```bash
 mkdir -p benchmark && touch benchmark/probe && git check-ignore -v benchmark/probe && rm benchmark/probe
 ```
 
-Attendu : une ligne `.gitignore:<numéro>:benchmark/	benchmark/probe`. Si la commande ne sort rien, l'ignore ne prend pas — corriger avant d'aller plus loin.
+Expected: a line reading `.gitignore:<number>:benchmark/	benchmark/probe`. If the command prints nothing, the ignore is not taking effect — fix that before going further.
 
-- [ ] **Step 3 : Committer (le seul commit de ce plan)**
+- [ ] **Step 3: Commit (the only commit in this plan)**
 
 ```bash
 git add .gitignore && git commit -m "chore: ignorer le harnais de performance benchmark/"
 ```
 
-- [ ] **Step 4 : Écrire le manifeste de téléchargement**
+- [ ] **Step 4: Write the download manifest**
 
-Créer `benchmark/pom.xml` :
+Create `benchmark/pom.xml`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -116,23 +118,23 @@ Créer `benchmark/pom.xml` :
 </project>
 ```
 
-- [ ] **Step 5 : Télécharger les jars**
+- [ ] **Step 5: Download the jars**
 
-⚠️ **Cette étape accède au réseau et écrit des jars sur le disque. Demander l'accord explicite avant de la lancer.**
+⚠️ **This step reaches the network and writes jars to disk. Get explicit approval before running it.**
 
 ```bash
 mvn -q -f benchmark/pom.xml dependency:copy-dependencies -DoutputDirectory=lib
 ```
 
-`-DoutputDirectory=lib` est relatif au `basedir` du POM, donc les jars atterrissent dans `benchmark/lib/`.
+`-DoutputDirectory=lib` is relative to the POM's `basedir`, so the jars land in `benchmark/lib/`.
 
-- [ ] **Step 6 : Vérifier le contenu de `benchmark/lib/`**
+- [ ] **Step 6: Check the contents of `benchmark/lib/`**
 
 ```bash
 ls -1 benchmark/lib/
 ```
 
-Attendu : exactement quatre jars —
+Expected: exactly four jars —
 
 ```
 commons-math3-3.6.1.jar
@@ -141,21 +143,21 @@ jmh-generator-annprocess-1.37.jar
 jopt-simple-5.0.4.jar
 ```
 
-Les numéros de version des deux transitives peuvent différer selon ce que résout JMH 1.37 : ce n'est pas un problème, le lanceur liste le répertoire au lieu de nommer les fichiers. En revanche, **quatre jars est le compte attendu** — s'il y en a moins, `jmh-core` n'a pas tiré ses transitives et la compilation de Task 2 échouera.
+The two transitives' version numbers may differ depending on what JMH 1.37 resolves — that is not a problem, since the launcher lists the directory rather than naming files. **Four jars is the expected count**, however: fewer means `jmh-core` did not pull its transitives, and Task 2's compilation will fail.
 
-- [ ] **Step 7 : Vérifier que le dépôt est resté propre**
+- [ ] **Step 7: Check the repository stayed clean**
 
 ```bash
 git status --short
 ```
 
-Attendu : **aucune sortie**. Si `benchmark/` apparaît, l'ignore du Step 1 n'a pas pris.
+Expected: **no output**. If `benchmark/` shows up, the Step 1 ignore did not take.
 
 ---
 
-### Task 2 : Le lanceur `benchmark/bench` et un premier benchmark bout-en-bout
+### Task 2: The `benchmark/bench` launcher and a first end-to-end benchmark
 
-Cette tâche valide la chaîne d'outillage entière — traitement d'annotations, génération de `META-INF/BenchmarkList`, classpath, fork des JVM de mesure — sur **un seul** benchmark. C'est le point de risque du plan, donc il est levé en premier.
+This task validates the entire toolchain — annotation processing, `META-INF/BenchmarkList` generation, the classpath, forking the measurement JVMs — against **one single** benchmark. It is the plan's risk point, so it is cleared first.
 
 **Files:**
 - Create: `benchmark/bench`
@@ -165,24 +167,24 @@ Cette tâche valide la chaîne d'outillage entière — traitement d'annotations
 **Interfaces:**
 - Consumes: `benchmark/lib/*.jar` (Task 1).
 - Produces:
-  - `./benchmark/bench [options JMH…]` — compile puis lance, en transmettant ses arguments à JMH.
-  - `benchmark/out/` — classes compilées + `META-INF/BenchmarkList`.
-  - `benchmark/results/<yyyy-MM-dd-HHmmss>.json` — rapport JMH.
-  - La classe `fr.craft.linkedinarchiveexplorer.cli.PipelineBenchmark`, que Task 3 étend.
+  - `./benchmark/bench [JMH options…]` — compiles then runs, forwarding its arguments to JMH.
+  - `benchmark/out/` — compiled classes + `META-INF/BenchmarkList`.
+  - `benchmark/results/<yyyy-MM-dd-HHmmss>.json` — the JMH report.
+  - The class `fr.craft.linkedinarchiveexplorer.cli.PipelineBenchmark`, which Task 3 extends.
 
-- [ ] **Step 1 : Choisir le terme mesuré**
+- [ ] **Step 1: Choose the measured term**
 
-Le terme doit avoir des occurrences dans l'archive, sinon `search` et `render` mesureraient du vide. Vérifier :
+The term must actually occur in the archive, otherwise `search` and `render` would measure nothing. Check:
 
 ```bash
 ./linkedin-archive-explorer --no-color craft | head -20
 ```
 
-Attendu : au moins un résultat. Si la sortie est vide, essayer un autre mot fréquent (`java`, `équipe`, `2024`…) et retenir celui qui sort des résultats. **Reporter le mot choisi dans la constante `TERM` du Step 3.**
+Expected: at least one result. If the output is empty, try another frequent word (`java`, `équipe`, `2024`…) and keep whichever produces results. **Carry the chosen word into the `TERM` constant in Step 3.**
 
-- [ ] **Step 2 : Écrire le lanceur**
+- [ ] **Step 2: Write the launcher**
 
-Créer `benchmark/bench` :
+Create `benchmark/bench`:
 
 ```java
 #!/usr/bin/env -S java --source 17
@@ -332,25 +334,25 @@ public final class Bench {
 }
 ```
 
-Rendre exécutable :
+Make it executable:
 
 ```bash
 chmod +x benchmark/bench
 ```
 
-- [ ] **Step 3 : Écrire le shim Windows**
+- [ ] **Step 3: Write the Windows shim**
 
-Créer `benchmark/bench.cmd` (une ligne, terminaisons CRLF conformément au `.gitattributes` — même si le fichier n'est pas versionné, autant rester cohérent) :
+Create `benchmark/bench.cmd` (one line, CRLF endings per `.gitattributes` — the file is not versioned, but staying consistent costs nothing):
 
 ```bat
 @cd /d "%~dp0.." && java --source 17 benchmark\bench %*
 ```
 
-- [ ] **Step 4 : Écrire le benchmark bout-en-bout, seul**
+- [ ] **Step 4: Write the end-to-end benchmark, on its own**
 
-Créer `benchmark/src/fr/craft/linkedinarchiveexplorer/cli/PipelineBenchmark.java`. Le package `cli` est imposé : `Main.run` est package-private, et la compilation classpath donne le même accès qu'aux tests.
+Create `benchmark/src/fr/craft/linkedinarchiveexplorer/cli/PipelineBenchmark.java`. The `cli` package is forced: `Main.run` is package-private, and compiling on the classpath grants the same access the tests have.
 
-**Remplacer la valeur de `TERM` par le mot retenu au Step 1.**
+**Replace the value of `TERM` with the word chosen in Step 1.**
 
 ```java
 package fr.craft.linkedinarchiveexplorer.cli;
@@ -413,76 +415,73 @@ public class PipelineBenchmark {
 }
 ```
 
-- [ ] **Step 5 : Vérifier le message d'erreur quand les jars manquent**
+- [ ] **Step 5: Check the error message when the jars are missing**
 
 ```bash
 mv benchmark/lib benchmark/lib.off && ./benchmark/bench; mv benchmark/lib.off benchmark/lib
 ```
 
-Attendu : sortie sur stderr `No JMH jar found in benchmark/lib/.` suivie de la commande `mvn`, et code de sortie 1. Le lanceur ne doit **pas** partir en `NoSuchFileException`.
+Expected: on stderr, `No JMH jar found in benchmark/lib/.` followed by the `mvn` command, and exit code 1. The launcher must **not** blow up with a `NoSuchFileException`.
 
-- [ ] **Step 6 : Lancer le benchmark en mode rapide**
+- [ ] **Step 6: Run the benchmark in fast mode**
 
 ```bash
 ./benchmark/bench -f 1 -wi 1 -i 2 -w 2 -r 2 endToEnd
 ```
 
-(`-w`/`-r` = durée d'une itération de chauffe / de mesure, ici 2 s, pour un aller-retour d'environ 10 s.)
+(`-w`/`-r` = the duration of one warmup / measurement iteration, here 2 s, for a round-trip of roughly 10 s.)
 
-Attendu, dans cet ordre :
-1. les deux compilations passent sans erreur ;
-2. JMH affiche `# JMH version: 1.37`, `# Benchmark: fr.craft.linkedinarchiveexplorer.cli.PipelineBenchmark.endToEnd` ;
-3. un tableau final du type
+Expected, in this order:
+1. both compilations pass without error;
+2. JMH prints `# JMH version: 1.37` and `# Benchmark: fr.craft.linkedinarchiveexplorer.cli.PipelineBenchmark.endToEnd`;
+3. a final table of the form
 
 ```
 Benchmark                    Mode  Cnt   Score   Error  Units
 PipelineBenchmark.endToEnd   avgt    2  xx,xxx          ms/op
 ```
 
-**Si `Unable to find the resource: /META-INF/BenchmarkList`** : le processeur d'annotations n'a pas tourné — vérifier que `-processorpath` pointe bien sur les jars et que `jmh-generator-annprocess` est présent dans `benchmark/lib/`.
+**If `Unable to find the resource: /META-INF/BenchmarkList` appears**: the annotation processor did not run — check that `-processorpath` really points at the jars and that `jmh-generator-annprocess` is present in `benchmark/lib/`.
 
-**Si JMH refuse de démarrer sur le JDK 26** de `mise.toml` : relancer sous le JDK 17
-plancher. `JAVA_HOME` **n'a aucun effet ici** — le shebang `#!/usr/bin/env -S java
---source 17` résout `java` depuis le `PATH`, et le `ProcessBuilder("java", …)` du lanceur
-fait de même ; il faut donc préfixer le `PATH`, pas positionner `JAVA_HOME` :
+**If JMH refuses to start on the JDK 26** pinned in `mise.toml`: rerun on the JDK 17 floor. `JAVA_HOME` **has no effect here** — the `#!/usr/bin/env -S java --source 17` shebang resolves `java` from `PATH`, and so does the launcher's `ProcessBuilder("java", …)`; you must therefore prefix `PATH` rather than set `JAVA_HOME`:
 
 ```bash
-mise install java@17   # si pas déjà installé — absent par défaut sur ce poste
+mise install java@17   # if not already installed — absent by default on this machine
 PATH="$(mise where java@17)/bin:$PATH" ./benchmark/bench -f 1 -wi 1 -i 2 endToEnd
 ```
 
-et noter le repli pour la Task 4.
+and record the fallback for Task 4.
 
-- [ ] **Step 7 : Vérifier que le rapport JSON a été écrit**
+- [ ] **Step 7: Check the JSON report was written**
 
 ```bash
 ls -1 benchmark/results/
 ```
 
-Attendu : un fichier `<yyyy-MM-dd-HHmmss>.json` non vide.
+Expected: a non-empty `<yyyy-MM-dd-HHmmss>.json` file.
 
-- [ ] **Step 8 : Vérifier que le dépôt est resté propre**
+- [ ] **Step 8: Check the repository stayed clean**
 
 ```bash
 git status --short
 ```
 
-Attendu : **aucune sortie**. Pas de commit pour cette tâche — tout est gitignoré, c'est le comportement recherché.
+Expected: **no output**. No commit for this task — everything is gitignored, which is the intended behaviour.
 
 ---
 
-### Task 3 : Les six benchmarks par étage
+### Task 3: The six stage-level benchmarks
 
 **Files:**
-- Modify: `benchmark/src/fr/craft/linkedinarchiveexplorer/cli/PipelineBenchmark.java` (remplacement intégral)
+- Modify: `benchmark/src/fr/craft/linkedinarchiveexplorer/cli/PipelineBenchmark.java` (wholesale replacement)
 
 **Interfaces:**
-- Consumes: le lanceur et la classe de Task 2.
-- Produces: sept `@Benchmark` — `endToEnd`, `openArchive`, `loadComments`, `loadShares`, `loadArticles`, `search`, `render`.
+- Consumes: the launcher and the class from Task 2.
+- Produces: seven `@Benchmark` methods — `endToEnd`, `openArchive`, `loadComments`, `loadShares`, `loadArticles`, `search`, `render`.
 
-- [ ] **Step 1 : Remplacer intégralement `PipelineBenchmark.java`**
+- [ ] **Step 1: Replace `PipelineBenchmark.java` wholesale**
 
-**Conserver la valeur de `TERM` retenue en Task 2 Step 1.**
+**Keep the `TERM` value chosen in Task 2 Step 1.**
 
 ```java
 package fr.craft.linkedinarchiveexplorer.cli;
@@ -632,110 +631,110 @@ public class PipelineBenchmark {
 }
 ```
 
-- [ ] **Step 2 : Vérifier que les sept benchmarks sont découverts**
+- [ ] **Step 2: Check all seven benchmarks are discovered**
 
 ```bash
 ./benchmark/bench -l
 ```
 
-Attendu : les sept noms listés, tous préfixés `fr.craft.linkedinarchiveexplorer.cli.PipelineBenchmark.` —
+Expected: the seven names listed, all prefixed `fr.craft.linkedinarchiveexplorer.cli.PipelineBenchmark.` —
 `endToEnd`, `loadArticles`, `loadComments`, `loadShares`, `openArchive`, `render`, `search`.
 
-- [ ] **Step 3 : Passe rapide sur les sept**
+- [ ] **Step 3: Fast pass over all seven**
 
 ```bash
 ./benchmark/bench -f 1 -wi 1 -i 2 -w 2 -r 2
 ```
 
-Attendu : un tableau final à sept lignes, chacune avec un `Score` numérique et l'unité `ms/op`. Aucune ligne ne doit afficher `NaN` ni `≈ 10⁻⁶`.
+Expected: a seven-row final table, each row carrying a numeric `Score` and the unit `ms/op`. No row may show `NaN` or `≈ 10⁻⁶`.
 
-Contrôles de cohérence — si l'un échoue, la mesure est fausse et il faut comprendre pourquoi avant la Task 4 :
-- `endToEnd` doit être **le plus lent** de tous ;
-- `openArchive` doit être nettement plus rapide que n'importe quel `load*` ;
-- `search` et `render` opèrent sur des données déjà en mémoire : ils doivent être très inférieurs à la somme des `load*`.
+Coherence checks — if one fails, the measurement is wrong and you must understand why before Task 4:
+- `endToEnd` must be **the slowest** of them all;
+- `openArchive` must be markedly faster than any `load*`;
+- `search` and `render` work on data already in memory: they must come out far below the sum of the `load*` figures.
 
-- [ ] **Step 4 : Vérifier que le dépôt est resté propre**
+- [ ] **Step 4: Check the repository stayed clean**
 
 ```bash
 git status --short
 ```
 
-Attendu : **aucune sortie**.
+Expected: **no output**.
 
 ---
 
-### Task 4 : Campagne de référence et consignation des chiffres
+### Task 4: Reference campaign and recording the numbers
 
 **Files:**
-- Modify: `docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md` (ajout d'une §9)
+- Modify: `docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md` (adding a §9)
 
 **Interfaces:**
-- Consumes: les sept benchmarks de Task 3.
-- Produces: une §9 « Résultats de référence » datée dans le spec — la seule trace versionnée des mesures.
+- Consumes: the seven benchmarks from Task 3.
+- Produces: a dated §9 "Reference results" in the spec — the only versioned trace of the measurements.
 
-- [ ] **Step 1 : Lancer la campagne complète**
+- [ ] **Step 1: Run the full campaign**
 
-Environ neuf minutes. Fermer les autres applications gourmandes ; brancher la machine sur secteur si c'est un portable (la mise à l'échelle de fréquence fausse les mesures).
+Roughly nine minutes. Close other demanding applications; plug the machine into mains power if it is a laptop (frequency scaling skews the measurements).
 
 ```bash
 ./benchmark/bench
 ```
 
-Attendu : le tableau final à sept lignes, cette fois avec une colonne `Error` renseignée (`± x,xxx`).
+Expected: the seven-row final table, this time with a populated `Error` column (`± x,xxx`).
 
-- [ ] **Step 2 : Relever le contexte de mesure**
+- [ ] **Step 2: Collect the measurement context**
 
 ```bash
 java -version 2>&1 | head -2 && uname -sr && ls -l data/*.zip
 ```
 
-Ces trois informations rendent les chiffres interprétables plus tard.
+These three pieces of information are what make the numbers interpretable later.
 
-- [ ] **Step 3 : Ajouter la §9 au spec**
+- [ ] **Step 3: Add §9 to the spec**
 
-Ajouter à la fin de `docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md`, en remplaçant chaque valeur entre chevrons par ce qui a été mesuré au Step 1 et relevé au Step 2 :
+Append to `docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md`, replacing every angle-bracketed value with what Step 1 measured and Step 2 collected:
 
 ```markdown
-## 9. Résultats de référence
+## 9. Reference results
 
-_Mesuré le <date>. JDK <version>, <OS>, archive de <taille>._
-_Ces chiffres ne sont pas portables (§7) : ils servent de point de comparaison
-avant/après sur ce poste, pas de référence absolue._
+_Measured <date>. JDK <version>, <OS>, <size> archive._
+_These numbers are not portable (§7): they are a before/after comparison point on this
+workstation, not an absolute reference._
 
-| Benchmark | Score (ms/op) | Erreur |
+| Benchmark | Score (ms/op) | Error |
 |---|---|---|
-| `endToEnd` | <score> | ± <erreur> |
-| `openArchive` | <score> | ± <erreur> |
-| `loadComments` | <score> | ± <erreur> |
-| `loadShares` | <score> | ± <erreur> |
-| `loadArticles` | <score> | ± <erreur> |
-| `search` | <score> | ± <erreur> |
-| `render` | <score> | ± <erreur> |
+| `endToEnd` | <score> | ± <error> |
+| `openArchive` | <score> | ± <error> |
+| `loadComments` | <score> | ± <error> |
+| `loadShares` | <score> | ± <error> |
+| `loadArticles` | <score> | ± <error> |
+| `search` | <score> | ± <error> |
+| `render` | <score> | ± <error> |
 
-**Lecture :** <une à trois phrases — quel étage domine, et l'écart entre endToEnd et la
-somme des étages.>
+**Reading:** <one to three sentences — which stage dominates, and the gap between
+endToEnd and the sum of the stages.>
 ```
 
-- [ ] **Step 4 : Committer**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md
 git commit -m "docs: résultats de référence des benchmarks JMH"
 ```
 
-- [ ] **Step 5 : Vérification finale**
+- [ ] **Step 5: Final verification**
 
 ```bash
 git status --short && ./bin/test 2>&1 | tail -5
 ```
 
-Attendu : `git status` muet, et la suite de tests toujours verte — aucune modification n'a touché `src/` ni `test/`.
+Expected: `git status` silent, and the test suite still green — no change touched `src/` or `test/`.
 
 ---
 
-## Points de vigilance pour l'exécutant
+## Watch-outs for whoever executes this
 
-1. **Ne pas chercher à committer `benchmark/`.** Trois des quatre tâches ne produisent aucun commit. C'est la décision centrale du spec (§2), pas un oubli.
-2. **Ne pas ajouter de tests JUnit sur le harnais.** Ils seraient eux-mêmes gitignorés, donc perdus au clone. La vérification passe par l'exécution, d'où les étapes « Attendu : … » détaillées.
-3. **Ne pas toucher à `src/`.** Si un benchmark ne compile pas, la cause est dans le harnais, jamais dans la production.
-4. **Les chiffres du premier run peuvent surprendre.** L'archive fait 700 Ko : `endToEnd` sera probablement de l'ordre de quelques dizaines de millisecondes, pas de la seconde. Ce n'est pas une erreur de mesure.
+1. **Do not try to commit `benchmark/`.** Three of the four tasks produce no commit at all. That is the spec's central decision (§2), not an oversight.
+2. **Do not add JUnit tests for the harness.** They would themselves be gitignored, and lost on a clone. Verification goes through execution instead, which is why the "Expected: …" steps are spelled out in detail.
+3. **Do not touch `src/`.** If a benchmark fails to compile, the cause is in the harness, never in production code.
+4. **The first run's numbers may surprise you.** The archive is 700 KB: `endToEnd` will likely land in the tens of milliseconds, not seconds. That is not a measurement error.

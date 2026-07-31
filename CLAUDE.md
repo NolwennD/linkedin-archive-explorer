@@ -4,13 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A command-line tool to **explore a LinkedIn data export**. It runs a literal,
-grep-style search (case- and accent-sensitive by default) over the user's **comments,
-posts and articles** and prints the matches grouped by type, newest first, with clickable
-LinkedIn links and ~40 characters of context around each occurrence. Two grep-style
-options relax the match: `-i`/`--ignore-case` (case-insensitive, accents still
-significant) and `-w`/`--word` (whole word only). See
+A tool to **explore a LinkedIn data export**. It runs a literal, grep-style search (case-
+and accent-sensitive by default) over the user's **comments, posts and articles** and
+shows the matches grouped by type, newest first, with clickable LinkedIn links and ~40
+characters of context around each occurrence. Two grep-style options relax the match:
+`-i`/`--ignore-case` (case-insensitive, accents still significant) and `-w`/`--word`
+(whole word only). See
 [docs/superpowers/specs/2026-07-24-search-options-design.md](docs/superpowers/specs/2026-07-24-search-options-design.md).
+
+It has **two interchangeable UIs over the same core**: the terminal, and a local web page
+served by the JDK's own HTTP server (`./linkedin-archive-explorer serve`). See
+[docs/superpowers/specs/2026-07-31-web-ui-design.md](docs/superpowers/specs/2026-07-31-web-ui-design.md).
 
 Full design and the rationale behind every decision:
 [docs/superpowers/specs/2026-07-22-linkedin-archive-explorer-design.md](docs/superpowers/specs/2026-07-22-linkedin-archive-explorer-design.md).
@@ -18,15 +22,24 @@ Read it before making structural changes.
 
 ## Hard constraints (do not break)
 
-- **Runtime is JDK-only.** Application code imports **only `java.*`** — no third-party
-  runtime dependency (no Jsoup, no CSV library). The CSV and HTML parsing are
-  hand-written. The only third-party jar is JUnit, and it is **test-scope only**
-  (`lib/junit-platform-console-standalone-*.jar`).
+- **Runtime is JDK-only — no external artifact.** Application code uses only APIs shipped
+  with the JDK: no third-party runtime dependency (no Jsoup, no CSV library, no web
+  framework). The CSV and HTML parsing are hand-written. The only third-party jar is
+  JUnit, and it is **test-scope only** (`lib/junit-platform-console-standalone-*.jar`).
+  `java.*` (Java SE) is the rule; the **single exception** is `com.sun.net.httpserver`
+  (module `jdk.httpserver`), used **only in the `web` module**. Rationale:
+  [the web UI design, § 2](docs/superpowers/specs/2026-07-31-web-ui-design.md).
 - **Zero build tool.** No Maven, no Gradle. Compile and package with the JDK's own
   `javac` / `jar` / `java`. (Maven may be used *only* as a one-off downloader for the
   JUnit jar into `lib/`.)
 - **Java 17 or newer** — the code is verified to compile and test-pass on JDK 17.
-  (`mise.toml` pins 26 for the dev environment.)
+  (`mise.toml` pins 26 for the dev environment.) Do **not** reach for `HttpHandlers` or
+  `SimpleFileServer` (Java 18+): raising the floor was weighed and rejected, they buy
+  three or four lines. See the web UI design, § 2.
+- **Nothing from the archive reaches a page unescaped.** In the `web` module every value
+  taken from the archive — and the search term — goes through `HtmlRenderer.escape`. An
+  authored post may legitimately contain `<script>`; without this it would run in the
+  user's own page. No JavaScript and no static files are served, by design.
 
 ## Commands
 
@@ -41,11 +54,20 @@ for Windows.
   `javac --module-source-path src -d out $(find src -name '*.java')`
 - **Run a single test class** (after `./bin/test` has compiled `out/` and `out-test/`):
   `java -jar lib/junit-platform-console-standalone-*.jar execute -cp "out-test:$(find out -mindepth 1 -maxdepth 1 -type d | tr '\n' ':')" --select-class fr.craft.linkedinarchiveexplorer.domain.SearchEngineTest`
-- **Build the CLI**: `./bin/build` — modular compile (enforcement) then packages every
+- **Build**: `./bin/build` — modular compile (enforcement) then packages every
   layer into `dist/linkedin-explorer.jar`. (Windows: `bin\build.cmd`.)
 - **Run the CLI**: `./linkedin-archive-explorer [--archive <path>] [--color|--no-color] [-i|--ignore-case] [-w|--word] <term>`
   — builds the jar on first use; equivalently `java -jar dist/linkedin-explorer.jar …`.
   (default archive: most recent `.zip` in `data/`).
+- **Run the web UI**: `./linkedin-archive-explorer serve [--archive <path>] [--port <n>]`
+  — serves the search page on `http://localhost:8080` (**loopback only**, never `0.0.0.0`:
+  the archive is personal). Ctrl-C to stop; no fallback if the port is taken. The launcher
+  dispatches on the `serve` argument to `…web.WebMain` instead of the jar's `Main-Class`.
+- **Run performance benchmarks**: `./benchmark/bench` — the JMH harness is **not in the
+  repository** (gitignored); rebuild it first per
+  [docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md](docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md)
+  and [docs/superpowers/plans/2026-07-28-jmh-benchmarks.md](docs/superpowers/plans/2026-07-28-jmh-benchmarks.md)
+  (the latter holds the actual source).
 
 ## Architecture
 
@@ -59,17 +81,25 @@ fr.craft.linkedinarchiveexplorer.domain          requires nothing        (model 
 fr.craft.linkedinarchiveexplorer.application      requires domain         (SearchContentsService)
 fr.craft.linkedinarchiveexplorer.infrastructure   requires domain         (zip/CSV/HTML adapters)
 fr.craft.linkedinarchiveexplorer.cli              requires the three above (Main + TerminalRenderer)
+fr.craft.linkedinarchiveexplorer.web              requires the three above (WebMain + HtmlRenderer)
+                                                  + jdk.httpserver
 ```
 
 - `application` must **not** `requires infrastructure`; ports (interfaces in `domain`)
-  are wired only in `cli`, the composition root.
+  are wired only in `cli` and `web`, the two composition roots.
+- **`cli` and `web` are siblings — no edge between them.** Two UI adapters over the same
+  core. The `serve` sub-command is dispatched by the `linkedin-archive-explorer` launcher,
+  a JEP 330 single-file program that lives *outside* the module graph. Never make one UI
+  module require the other.
 - **Compile as modules, run as a plain classpath jar**: `module-info.class` are ignored
-  at runtime — the enforcement is purely a compile-time guarantee.
+  at runtime — the enforcement is purely a compile-time guarantee. `jdk.httpserver`
+  resolves from the classpath without `--add-modules` (verified).
 
 ### Two extension seams (keep them)
 
-1. **UI**: the search core (`domain` + `application`) is independent of the CLI, so a
-   future web UI can reuse it unchanged.
+1. **UI**: the search core (`domain` + `application`) is independent of any UI — which is
+   why the `web` module could be added without touching `domain`, `application` or
+   `infrastructure`. Keep it that way.
 2. **HTML extraction**: behind the `ArticleTextExtractor` port. JDK-only implementation
    now; a Jsoup-backed one can replace it without touching anything else.
 

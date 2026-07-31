@@ -1,8 +1,11 @@
 # LinkedIn Archive Explorer
 
-A command-line tool to **explore a LinkedIn data export** and quickly find the
-**comments, posts and articles** that mention a given topic — with a snippet of context
-and a clickable link to the content on LinkedIn.
+A tool to **explore a LinkedIn data export** and quickly find the **comments, posts and
+articles** that mention a given topic — with a snippet of context and a clickable link to
+the content on LinkedIn.
+
+It comes with **two interfaces over the same search engine**: a command line, and a
+[local web page](#web-interface) if you would rather search from a browser.
 
 You can ask for your data on this [LinkedIn page](https://www.linkedin.com/mypreferences/d/download-my-data).
 You will receive two archives, first one a few hours later, the second in a few days. **This tool uses the second**. 
@@ -12,13 +15,14 @@ grouped by type and sorted from newest to oldest.
 
 ## What it does
 
-- **Literal** search (like `grep`), **case- and accent-sensitive**: `Date` ≠ `date`,
-  `developpeur` ≠ `développeur`.
+- **Literal** search (like `grep`), **case- and accent-sensitive** by default: `Date` ≠
+  `date`, `developpeur` ≠ `développeur`. Two `grep`-style options relax it: `-i` ignores
+  case, `-w` matches whole words only. Accents always stay significant.
 - Results **grouped by type** (articles, posts, comments) and **sorted by descending
   date**.
-- For each match: a **clickable link** to LinkedIn (OSC 8 terminal hyperlinks) and the
-  **list of excerpts** (~40 characters of context around each occurrence, term
-  highlighted).
+- For each match: a **clickable link** to LinkedIn (OSC 8 hyperlinks in the terminal, plain
+  links on the web page) and the **list of excerpts** (~40 characters of context around
+  each occurrence, term highlighted).
 - Content that matches several times appears **only once**, with all of its excerpts.
 
 ## Which files it reads
@@ -66,7 +70,7 @@ The easiest way is the **launcher** — a single-file Java program
 builds the jar on first use:
 
 ```sh
-./linkedin-archive-explorer [--archive <path>] [--color|--no-color] <term>
+./linkedin-archive-explorer [--archive <path>] [--color|--no-color] [-i] [-w] <term>
 ```
 
 Run it from the project root: if `dist/linkedin-explorer.jar` is missing it is built
@@ -83,6 +87,10 @@ java -jar dist/linkedin-explorer.jar [--archive <path>] [--color|--no-color] <te
   in the file name (`MM-DD-YYYY`, e.g. `Complete_LinkedInDataExport_07-21-2026.zip`),
   falling back to the last-modified time. So the usual workflow is: drop your export into
   `data/` and run the command with just a search term.
+- `-i` / `--ignore-case`: ignore case, so `date` also finds `Date` and `DATE`. **Accents
+  remain significant**: `developpe` still does not find `développe`.
+- `-w` / `--word`: match **whole words only**, so `dev` no longer matches inside
+  `developpeur`. The short flags combine: `-iw` (or `-wi`).
 - `--color` / `--no-color`: force or disable colors and clickable links. **Enabled by
   default** in a terminal, and automatically disabled when the output is redirected (pipe,
   file). The `NO_COLOR` environment variable is also respected. Konsole tip: **Ctrl+click**
@@ -95,6 +103,44 @@ java -jar dist/linkedin-explorer.jar [--archive <path>] [--color|--no-color] <te
 ```
 
 If the term is found nowhere, the program prints `No results for "…"`.
+
+## Web interface
+
+Same search, same results, in a browser:
+
+```sh
+./linkedin-archive-explorer serve
+```
+
+Then open **<http://localhost:8080>**. Press Ctrl-C to stop the server.
+
+```sh
+./linkedin-archive-explorer serve [--archive <path>] [--port <n>]
+```
+
+- `--archive <path>`: same meaning as for the command line — omitted, the most recent
+  `.zip` in `data/` is used.
+- `--port <n>`: the port to listen on, **8080** by default. If it is already taken the
+  server says so and stops; it never silently picks another one, so the address you were
+  given is always the address that works.
+
+### What the page gives you
+
+- A **search field** and the two option checkboxes (*Ignore case*, *Whole word*), matching
+  the `-i` and `-w` flags.
+- Results **grouped by type**, each group **collapsible** — handy when a common term
+  returns hundreds of comments and buries everything else. The count stays visible on the
+  collapsed group.
+- The search lives **entirely in the URL** (`/?q=café&i=on`), so a search is bookmarkable
+  and shareable, and the browser's back button becomes your search history.
+
+### Privacy
+
+The server listens on **`127.0.0.1` only** — never on your network interface. Your export
+is personal data, so it stays on your machine, and nobody else on the network can reach it.
+There is **no JavaScript** and no file serving: the page is plain HTML built server-side,
+and everything coming out of the archive is escaped, so a post of yours containing markup
+is shown as text rather than executed.
 
 ## Multiple archives
 

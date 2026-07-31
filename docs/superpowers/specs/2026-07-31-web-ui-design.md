@@ -160,6 +160,12 @@ correspondent exactement à `-i`/`--ignore-case` et `-w`/`--word` du CLI. Une ca
 émet `on`, décochée n'émet rien : c'est la sémantique HTML standard, et elle donne des URL
 lisibles.
 
+Le champ porte **`required`** : un champ vide **désactive la recherche**, le navigateur
+refusant de soumettre le formulaire. C'est la voie native — aucun JavaScript pour activer
+ou désactiver un bouton. Un terme réduit à des espaces, lui, passe `required` (le
+navigateur ne le considère pas vide) : c'est le serveur qui le traite comme « pas de
+recherche » et rend le formulaire, cf. la table des routes ci-dessus.
+
 ### Structure sémantique
 
 Le HTML porte le sens, pour que le CSS n'ait presque rien à faire :
@@ -178,7 +184,7 @@ Le HTML porte le sens, pour que le CSS n'ait presque rien à faire :
     <search>
       <form method="get" action="/">
         <label for="q">Search</label>
-        <input type="search" id="q" name="q" value="café" autofocus>
+        <input type="search" id="q" name="q" value="café" required autofocus>
         <label><input type="checkbox" name="i" checked> Ignore case</label>
         <label><input type="checkbox" name="w"> Whole word</label>
         <button type="submit">Search</button>

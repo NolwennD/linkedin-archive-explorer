@@ -78,7 +78,7 @@ public final class HtmlRenderer {
         <search>
         <form method="get" action="/">
         <label for="q">Search</label>
-        <input type="search" id="q" name="q" value="%s" autofocus>
+        <input type="search" id="q" name="q" value="%s" required autofocus>
         <label><input type="checkbox" name="i"%s> Ignore case</label>
         <label><input type="checkbox" name="w"%s> Whole word</label>
         <button type="submit">Search</button>

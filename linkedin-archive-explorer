@@ -12,7 +12,14 @@ import java.util.List;
  * missing.
  *
  * <p>Usage, from the project root:
- * <pre>./linkedin-archive-explorer [--archive &lt;path&gt;] [--color|--no-color] &lt;term&gt;</pre>
+ * <pre>
+ * ./linkedin-archive-explorer [--archive &lt;path&gt;] [--color|--no-color] &lt;term&gt;
+ * ./linkedin-archive-explorer serve [--archive &lt;path&gt;] [--port &lt;n&gt;]
+ * </pre>
+ *
+ * <p>The {@code serve} sub-command runs the web UI instead of the terminal one. The two
+ * are sibling adapters with no dependency on each other, so the choice is made here — in a
+ * single-file program that lives outside the module graph — rather than in either module.
  *
  * <p>The class name is irrelevant in source-file mode; only the file name matters.
  */
@@ -20,6 +27,8 @@ public final class Launcher {
 
   private static final String JAR = "dist/linkedin-explorer.jar";
   private static final String BUILD_SCRIPT = "bin/build";
+  private static final String SERVE = "serve";
+  private static final String WEB_MAIN = "fr.craft.linkedinarchiveexplorer.web.WebMain";
 
   public static void main(String[] args) throws IOException, InterruptedException {
     if (!new File(JAR).isFile()) {
@@ -33,8 +42,16 @@ public final class Launcher {
         System.exit(status);
       }
     }
-    List<String> command = new ArrayList<>(List.of("java", "-jar", JAR));
-    command.addAll(List.of(args));
+    List<String> arguments = new ArrayList<>(List.of(args));
+    List<String> command;
+    if (!arguments.isEmpty() && SERVE.equals(arguments.get(0))) {
+      arguments.remove(0);
+      // The jar's Main-Class stays the CLI, so the web entry point is named explicitly.
+      command = new ArrayList<>(List.of("java", "-cp", JAR, WEB_MAIN));
+    } else {
+      command = new ArrayList<>(List.of("java", "-jar", JAR));
+    }
+    command.addAll(arguments);
     System.exit(exec(command));
   }
 

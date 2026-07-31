@@ -277,6 +277,12 @@ class HtmlRendererTest {
     void titlesThePageWithTheApplicationNameAlone() {
       assertTrue(renderer.renderEmptyForm().contains("<title>LinkedIn archive explorer</title>"));
     }
+
+    @Test
+    void refusesToSubmitAnEmptyTerm() {
+      // `required` disables the search the HTML-native way — no JavaScript involved.
+      assertTrue(renderer.renderEmptyForm().contains("value=\"\" required"), renderer.renderEmptyForm());
+    }
   }
 
   @Nested

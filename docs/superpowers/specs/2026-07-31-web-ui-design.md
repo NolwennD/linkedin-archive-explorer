@@ -50,6 +50,21 @@ Deux alternatives ont été écartées :
   garde son plancher **JDK 17** : on n'utilise que l'API `HttpServer` / `HttpHandler` /
   `HttpExchange`, disponible depuis Java 6.
 
+**Passer le plancher à 21 pour utiliser ces fabriques a été envisagé, puis écarté** — le
+gain mesuré est nul :
+
+- `SimpleFileServer` sert des fichiers depuis un répertoire. Le design n'en a **aucun**
+  (CSS inline, zéro JS) : inapplicable, et cette absence est un bénéfice de sécurité (§ 4).
+- `HttpHandlers.of(status, headers, body)` produit une réponse **constante** ; la nôtre est
+  le résultat d'une recherche : inapplicable.
+- `HttpHandlers.handleOrElse` et la fabrique `HttpServer.create(addr, backlog, path,
+  handler, filters…)` économiseraient, ensemble, trois ou quatre lignes de routage.
+
+Ce qui justifierait 21 serait les **threads virtuels** — sans objet ici, puisque le
+traitement est délibérément séquentiel (§ 5). Le plancher reste donc 17, et il ne coûte
+rien : ni `bin/build` ni `bin/test` ne passent de `--release`, la compilation utilise le
+JDK présent (26 via `mise.toml`).
+
 ### Résolution du module à l'exécution
 
 Le jar tourne en **classpath** (les `module-info.class` sont ignorés à l'exécution, cf.

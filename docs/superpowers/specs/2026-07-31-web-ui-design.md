@@ -89,9 +89,12 @@ fr.craft.linkedinarchiveexplorer.web             requires les trois ci-dessus + 
 ```
 
 **Aucune arête entre `cli` et `web`.** Ce sont deux adaptateurs UI jumeaux, chacun sa
-racine de composition — exactement ce que la couture n°1 promettait. Le dispatch entre
-les deux se fait dans le script de lancement (§ 6), pas en Java : c'est le seul moyen
-d'offrir une commande unique **sans** faire dépendre une UI de l'autre.
+racine de composition — exactement ce que la couture n°1 promettait.
+
+Le dispatch entre les deux se fait dans le lanceur `linkedin-archive-explorer` (§ 6).
+Celui-ci est lui-même écrit en Java, mais c'est un **programme mono-fichier JEP 330, hors
+du graphe de modules** : il ne fait que choisir la classe main passée à `java`. C'est ce
+qui permet d'offrir une commande unique **sans** faire dépendre une UI de l'autre.
 
 ```
 src/fr.craft.linkedinarchiveexplorer.web/
@@ -157,25 +160,102 @@ correspondent exactement à `-i`/`--ignore-case` et `-w`/`--word` du CLI. Une ca
 émet `on`, décochée n'émet rien : c'est la sémantique HTML standard, et elle donne des URL
 lisibles.
 
-### Contenu
+### Structure sémantique
 
-Les résultats sont groupés par type dans l'ordre canonique (`ContentType.values()`), avec
-le **nombre de résultats** dans le titre du groupe :
+Le HTML porte le sens, pour que le CSS n'ait presque rien à faire :
 
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>café — LinkedIn archive explorer</title>
+</head>
+<body>
+  <header>
+    <h1>LinkedIn archive explorer</h1>
+    <search>
+      <form method="get" action="/">
+        <label for="q">Search</label>
+        <input type="search" id="q" name="q" value="café" autofocus>
+        <label><input type="checkbox" name="i" checked> Ignore case</label>
+        <label><input type="checkbox" name="w"> Whole word</label>
+        <button type="submit">Search</button>
+      </form>
+    </search>
+  </header>
+
+  <main>
+    <section aria-labelledby="comments">
+      <details open>
+        <summary><h2 id="comments">Comments <span class="count">(41)</span></h2></summary>
+        <ol>
+          <li>
+            <article>
+              <h3><a href="https://li/1">https://li/1</a></h3>
+              <time datetime="2024-11-06">2024-11-06</time>
+              <ul>
+                <li>…un <mark>café</mark> serré…</li>
+              </ul>
+            </article>
+          </li>
+        </ol>
+      </details>
+    </section>
+  </main>
+
+  <footer>Archive: data/export.zip</footer>
+</body>
+</html>
 ```
-ARTICLES (3)
-POSTS (12)
-COMMENTS (41)
-```
 
-Chaque résultat : sa date entre crochets quand elle existe (les articles n'en ont pas), un
-lien `<a href>` vers LinkedIn, puis ses extraits. Dans chaque extrait, l'occurrence est
-enveloppée dans un **`<mark>`** — l'élément HTML sémantique pour un résultat de recherche
-mis en évidence, qui se surligne tout seul sans une ligne de CSS.
+Les choix qui portent quelque chose :
 
-**Le texte de l'interface est en anglais**, comme celui du CLI : les mêmes titres de
-groupe (`ARTICLES`, `POSTS`, `COMMENTS`), et le même message quand rien ne sort —
-`No results for "<terme>".`. Deux UI du même outil ne parlent pas deux langues.
+- **`<search>`** plutôt que `<form role="search">` — l'élément dédié au repère de
+  recherche, largement supporté depuis 2023.
+- **`<ol>` pour les résultats d'un groupe** : leur ordre est *signifiant* (date
+  décroissante, comme le CLI). Une liste non ordonnée mentirait sur la donnée.
+- **`<article>` par résultat** — un post ou un commentaire est exactement ce que la
+  spécification HTML appelle « une composition autonome ».
+- **`<time datetime="…">`** au lieu des crochets `[2024-11-06]` du terminal : la date
+  devient lisible par une machine.
+- **`<mark>`** autour de l'occurrence — l'élément sémantique du résultat de recherche mis
+  en évidence, qui se surligne sans une ligne de CSS.
+- **`<title>` portant le terme** (`café — LinkedIn archive explorer`) : prolonge la
+  décision « l'état vit dans l'URL » jusqu'à l'historique et aux onglets du navigateur.
+- **`aria-labelledby`** relie chaque `<section>` à son `<h2>`, donc chaque groupe devient
+  un repère navigable au lecteur d'écran.
+
+Deux appels au jugement, assumés : les **extraits** d'un même résultat sont un `<ul>` et
+non un `<ol>` — rien dans l'UI ne désigne « le 3ᵉ extrait », donc les numéroter
+n'apporterait rien ; et le **lien est le `<h3>`** du résultat, ce qui donne un plan de
+document navigable au prix d'un titre qui est une URL brute.
+
+### Groupes repliables
+
+Le nombre de résultats est imprévisible : un terme courant peut en produire des centaines,
+et le groupe `COMMENTS` enterrerait alors les deux autres. Chaque groupe est donc
+**repliable**, via `<details open>` / `<summary>` — de l'HTML pur, ce qui préserve la
+décision « aucun JavaScript ».
+
+- **Tous les groupes sont ouverts au chargement.** Pas de seuil du genre « replier
+  au-delà de 20 résultats » : ce serait un nombre magique invérifiable, et une page qui
+  cache des résultats sans qu'on le lui ait demandé.
+- **L'état ouvert/replié ne survit pas à une nouvelle recherche** — chaque soumission est
+  un chargement de page complet, et le conserver demanderait du JS ou des paramètres d'URL
+  supplémentaires. C'est le prix assumé du zéro-JS.
+- Le **compteur dans le `<summary>`** prend ici tout son sens : replié, un groupe annonce
+  encore ce qu'il contient. Tous groupes repliés, les `<summary>` forment un sommaire.
+- Note : Chromium déplie automatiquement un `<details>` fermé lors d'une recherche
+  Ctrl+F. Ce n'est **pas** un comportement universel entre navigateurs — c'est un bonus,
+  pas une garantie sur laquelle s'appuyer.
+
+### Texte
+
+**L'interface est en anglais**, comme le CLI : les mêmes titres de groupe (`Articles`,
+`Posts`, `Comments`), et le même message quand rien ne sort — `No results for "<terme>".`.
+Deux UI du même outil ne parlent pas deux langues.
 
 Un pied de page affiche l'archive utilisée, en écho au `Using archive: …` du CLI : utile
 quand plusieurs exports traînent dans `data/`.
@@ -208,10 +288,15 @@ Arrêt par Ctrl-C ; un shutdown hook ferme le `ZipArchive`.
 ./linkedin-archive-explorer serve [--archive <path>] [--port <n>]
 ```
 
-Le script détecte `serve` en **premier argument**, le retire, et lance la classe main du
-module `web` avec le reste des arguments. Sans `serve`, le comportement actuel est
-**strictement inchangé** — aucune régression possible sur le CLI. Un `.cmd` équivalent
-pour Windows, comme pour les autres scripts.
+Le lanceur `linkedin-archive-explorer` détecte `serve` en **premier argument**, le retire,
+et lance `java -cp dist/linkedin-explorer.jar
+fr.craft.linkedinarchiveexplorer.web.WebMain` avec le reste des arguments — au lieu du
+`java -jar` habituel, dont le `Main-Class` reste `cli.Main`. Sans `serve`, le comportement
+actuel est **strictement inchangé** — aucune régression possible sur le CLI.
+
+`linkedin-archive-explorer.cmd` se contente de déléguer au programme Java
+(`java --source 17 linkedin-archive-explorer %*`) : **rien à y changer**, Windows suit
+automatiquement.
 
 - **`--port`** : port d'écoute, **8080 par défaut**.
 - **`--archive`** : même sémantique que le CLI (défaut : le `.zip` le plus récent de
@@ -261,10 +346,15 @@ d'I/O maîtrisée, aucun framework de mock.
 `@Nested` par facette, fixtures inline :
 
 - *Grouping* — ordre canonique des types, compteur par groupe, groupe vide absent.
-- *HitRendering* — date présente / absente, lien, extraits multiples d'un même contenu.
+- *HitRendering* — date en `<time datetime>` présente / absente, lien, extraits multiples
+  d'un même contenu.
 - *Highlighting* — l'occurrence est dans un `<mark>`, le reste de l'extrait n'y est pas.
 - *Escaping* — un contenu portant `<script>`, `&`, `"` ressort échappé ; idem pour le
   terme recherché et pour l'URL en attribut.
+- *Collapsing* — chaque groupe est un `<details open>` avec son compteur dans le
+  `<summary>`.
+- *Form* — le formulaire est pré-rempli par le terme, et les cases `i`/`w` sont `checked`
+  exactement quand les options correspondantes sont actives.
 - *EmptyResults* — le message « aucun résultat » et le formulaire toujours présent.
 
 **`QueryParametersTest`** — un `@ParameterizedTest` avec `name =` sur les cas de décodage :

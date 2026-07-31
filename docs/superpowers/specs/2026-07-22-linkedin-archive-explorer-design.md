@@ -120,6 +120,10 @@ compilation. Voir §10 pour le build.
 ### Deux coutures d'extension explicites
 1. **Interface utilisateur** : le moteur de recherche (`domain` + `application`) est
    isolé du CLI. Une future UI web branche un autre adapter primaire sur le même cœur.
+
+   > **Réalisée le 2026-07-31.** Le module `web` a été ajouté sans modifier une ligne de
+   > `domain`, `application` ni `infrastructure` — la couture a tenu.
+   > Voir [le design de l'UI web](2026-07-31-web-ui-design.md).
 2. **Extraction HTML** : derrière le port `ArticleTextExtractor`. Implémentation
    **JDK pur** en v1 ; une future implémentation basée sur **Jsoup** la remplacera sans
    toucher au reste.

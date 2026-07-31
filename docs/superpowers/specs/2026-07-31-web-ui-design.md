@@ -91,6 +91,12 @@ fr.craft.linkedinarchiveexplorer.web             requires les trois ci-dessus + 
 **Aucune arête entre `cli` et `web`.** Ce sont deux adaptateurs UI jumeaux, chacun sa
 racine de composition — exactement ce que la couture n°1 promettait.
 
+> **Amendé le 2026-07-31**, le jour même. Ces deux racines de composition dupliquaient le
+> wiring des adapters ; un module `launcher` (le type `Explorer`) les remplace. `web`
+> `requires` désormais `…launcher` au lieu de `…infrastructure` — et ne peut donc plus
+> nommer un adaptateur concret. Les extraits de `WebMain` ci-dessous décrivent l'état
+> d'origine : voir [le design de la racine de composition](2026-07-31-composition-root-design.md).
+
 Le dispatch entre les deux se fait dans le lanceur `linkedin-archive-explorer` (§ 6).
 Celui-ci est lui-même écrit en Java, mais c'est un **programme mono-fichier JEP 330, hors
 du graphe de modules** : il ne fait que choisir la classe main passée à `java`. C'est ce

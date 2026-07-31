@@ -1,27 +1,16 @@
 package fr.craft.linkedinarchiveexplorer.cli;
 
-import fr.craft.linkedinarchiveexplorer.application.SearchContentsService;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
-import fr.craft.linkedinarchiveexplorer.domain.ContentSource;
-import fr.craft.linkedinarchiveexplorer.domain.SearchEngine;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
 import fr.craft.linkedinarchiveexplorer.domain.WordScope;
-import fr.craft.linkedinarchiveexplorer.infrastructure.ArchiveLocator;
-import fr.craft.linkedinarchiveexplorer.infrastructure.ArticlesContentSource;
-import fr.craft.linkedinarchiveexplorer.infrastructure.CommentsContentSource;
-import fr.craft.linkedinarchiveexplorer.infrastructure.JdkArticleTextExtractor;
-import fr.craft.linkedinarchiveexplorer.infrastructure.SharesContentSource;
-import fr.craft.linkedinarchiveexplorer.infrastructure.ZipArchive;
+import fr.craft.linkedinarchiveexplorer.launcher.ArchiveUnavailableException;
+import fr.craft.linkedinarchiveexplorer.launcher.Explorer;
 import java.io.PrintStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
-/** CLI entry point and composition root: parses arguments and wires the adapters. */
+/** CLI entry point: parses arguments, then renders what the {@link Explorer} finds. */
 public final class Main {
-
-  private static final Path DEFAULT_ARCHIVE_DIR = Path.of("data");
 
   public static void main(String[] args) {
     System.exit(new Main().run(args, System.out, System.err, styleByDefault()));
@@ -91,28 +80,17 @@ public final class Main {
       return usage(err);
     }
 
-    Path archive = archivePath != null ? archivePath : ArchiveLocator.mostRecent(DEFAULT_ARCHIVE_DIR).orElse(null);
-    if (archive == null) {
-      err.println("No archive found in " + DEFAULT_ARCHIVE_DIR + "/ (or use --archive <path>).");
-      return 1;
-    }
-    if (!Files.isReadable(archive)) {
-      err.println("Cannot read archive: " + archive);
-      return 1;
-    }
-    out.println("Using archive: " + archive);
-
     boolean styled = !noColor && (forceColor || defaultStyled);
-    try (ZipArchive zip = ZipArchive.open(archive)) {
-      List<ContentSource> sources =
-          List.of(
-              new CommentsContentSource(zip),
-              new SharesContentSource(zip),
-              new ArticlesContentSource(zip, new JdkArticleTextExtractor()));
+    try (Explorer explorer = Explorer.open(archivePath)) {
+      out.println("Using archive: " + explorer.archive());
       SearchTerm searchTerm = new SearchTerm(term, caseSensitivity, wordScope);
-      SearchResults results = new SearchContentsService(sources, new SearchEngine()).search(searchTerm);
+      SearchResults results = explorer.service().search(searchTerm);
       out.print(new TerminalRenderer(styled).render(searchTerm, results));
       return 0;
+    } catch (ArchiveUnavailableException unavailable) {
+      // Its message is already written for the user: no "Error: " prefix.
+      err.println(unavailable.getMessage());
+      return 1;
     } catch (RuntimeException failure) {
       err.println("Error: " + failure.getMessage());
       return 1;

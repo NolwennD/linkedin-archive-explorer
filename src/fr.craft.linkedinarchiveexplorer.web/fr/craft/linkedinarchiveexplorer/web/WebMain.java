@@ -1,31 +1,21 @@
 package fr.craft.linkedinarchiveexplorer.web;
 
 import com.sun.net.httpserver.HttpServer;
-import fr.craft.linkedinarchiveexplorer.application.SearchContentsService;
-import fr.craft.linkedinarchiveexplorer.domain.ContentSource;
-import fr.craft.linkedinarchiveexplorer.domain.SearchEngine;
-import fr.craft.linkedinarchiveexplorer.infrastructure.ArchiveLocator;
-import fr.craft.linkedinarchiveexplorer.infrastructure.ArticlesContentSource;
-import fr.craft.linkedinarchiveexplorer.infrastructure.CommentsContentSource;
-import fr.craft.linkedinarchiveexplorer.infrastructure.JdkArticleTextExtractor;
-import fr.craft.linkedinarchiveexplorer.infrastructure.SharesContentSource;
-import fr.craft.linkedinarchiveexplorer.infrastructure.ZipArchive;
+import fr.craft.linkedinarchiveexplorer.launcher.ArchiveUnavailableException;
+import fr.craft.linkedinarchiveexplorer.launcher.Explorer;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.BindException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 /**
- * Web entry point and composition root — the twin of the CLI's {@code Main}, wiring the
- * same adapters behind an HTTP server instead of a terminal.
+ * Web entry point — the twin of the CLI's {@code Main}, putting the same
+ * {@link Explorer} behind an HTTP server instead of a terminal.
  */
 public final class WebMain {
 
-  private static final Path DEFAULT_ARCHIVE_DIR = Path.of("data");
   private static final int DEFAULT_PORT = 8080;
 
   public static void main(String[] args) {
@@ -64,22 +54,23 @@ public final class WebMain {
       }
     }
 
-    Path archive =
-        archivePath != null ? archivePath : ArchiveLocator.mostRecent(DEFAULT_ARCHIVE_DIR).orElse(null);
-    if (archive == null) {
-      err.println("No archive found in " + DEFAULT_ARCHIVE_DIR + "/ (or use --archive <path>).");
+    Explorer explorer;
+    try {
+      explorer = Explorer.open(archivePath);
+    } catch (ArchiveUnavailableException unavailable) {
+      // Its message is already written for the user: no "Error: " prefix.
+      err.println(unavailable.getMessage());
       return 1;
-    }
-    if (!Files.isReadable(archive)) {
-      err.println("Cannot read archive: " + archive);
+    } catch (RuntimeException failure) {
+      // A damaged archive must not reach the terminal as a stack trace.
+      err.println("Error: " + failure.getMessage());
       return 1;
     }
 
-    ZipArchive zip = ZipArchive.open(archive);
     try {
-      HttpServer server = start(zip, archive.toString(), port);
-      Runtime.getRuntime().addShutdownHook(new Thread(() -> shutDown(server, zip)));
-      out.println("Using archive: " + archive);
+      HttpServer server = start(explorer, port);
+      Runtime.getRuntime().addShutdownHook(new Thread(() -> shutDown(server, explorer)));
+      out.println("Using archive: " + explorer.archive());
       out.println("Serving on http://localhost:" + server.getAddress().getPort() + " — Ctrl-C to stop");
       return 0;
     } catch (BindException taken) {
@@ -87,45 +78,39 @@ public final class WebMain {
       // worse than one that plainly refuses to start.
       err.println(
           "Port " + port + " already in use — try: ./linkedin-archive-explorer serve --port " + (port + 1));
-      closeQuietly(zip);
+      closeQuietly(explorer);
       return 1;
     } catch (IOException | RuntimeException failure) {
       err.println("Error: " + failure.getMessage());
-      closeQuietly(zip);
+      closeQuietly(explorer);
       return 1;
     }
   }
 
   /**
-   * Wires the adapters onto an already-open archive and starts the server on the loopback
-   * interface. The caller keeps ownership of {@code zip}. Port {@code 0} asks the system
-   * for a free port; read the one actually bound from {@code server.getAddress()}.
+   * Starts the server on the loopback interface, serving what {@code explorer} searches.
+   * The caller keeps ownership of {@code explorer}. Port {@code 0} asks the system for a
+   * free port; read the one actually bound from {@code server.getAddress()}.
    */
-  static HttpServer start(ZipArchive zip, String archiveLabel, int port) throws IOException {
-    List<ContentSource> sources =
-        List.of(
-            new CommentsContentSource(zip),
-            new SharesContentSource(zip),
-            new ArticlesContentSource(zip, new JdkArticleTextExtractor()));
-    SearchContentsService service = new SearchContentsService(sources, new SearchEngine());
-
+  static HttpServer start(Explorer explorer, int port) throws IOException {
     HttpServer server =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
-    server.createContext("/", new SearchHandler(service, new HtmlRenderer(archiveLabel)));
+    server.createContext(
+        "/", new SearchHandler(explorer.service(), new HtmlRenderer(explorer.archive().toString())));
     // A single local user: sequential handling means no concurrency over the shared zip.
     server.setExecutor(null);
     server.start();
     return server;
   }
 
-  private static void shutDown(HttpServer server, ZipArchive zip) {
+  private static void shutDown(HttpServer server, Explorer explorer) {
     server.stop(0);
-    closeQuietly(zip);
+    closeQuietly(explorer);
   }
 
-  private static void closeQuietly(ZipArchive zip) {
+  private static void closeQuietly(Explorer explorer) {
     try {
-      zip.close();
+      explorer.close();
     } catch (Exception ignored) {
       // Nothing useful left to do while shutting down.
     }

@@ -111,6 +111,11 @@ Règles ainsi garanties **à la compilation** :
   injection des interfaces définies dans `domain` ;
 - aucun cycle entre couches (interdit par le JPMS).
 
+> **Amendé le 2026-07-31.** L'arrivée de l'UI web a donné une **seconde** racine de
+> composition, qui dupliquait le wiring. Un module `launcher` (le type `Explorer`) la
+> porte désormais seul : `cli` et `web` ne `requires` plus `infrastructure` du tout.
+> Voir [le design de la racine de composition](2026-07-31-composition-root-design.md).
+
 **Compilation vs exécution** : on compile en multi-module (donc enforcement archi),
 mais on **package et exécute en classpath simple, un seul jar** (`java -jar …`). Les
 `module-info.class` sont alors ignorés au runtime (module anonyme) — l'encapsulation

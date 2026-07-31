@@ -5,8 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpServer;
-import fr.craft.linkedinarchiveexplorer.infrastructure.ZipArchive;
+import fr.craft.linkedinarchiveexplorer.launcher.Explorer;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -19,6 +22,9 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 
 class WebAcceptanceTest {
+
+  /** The versioned damaged archive (a real zip with its END header truncated away). */
+  private static final Path CORRUPTED_ARCHIVE = Path.of("test/data/corrupted.zip");
 
   /** A test body running against an already-started server. */
   private interface ServerTest {
@@ -44,8 +50,8 @@ class WebAcceptanceTest {
 
   /** Starts the server on an ephemeral port, so tests never collide with a real one. */
   private static void serving(Path archive, ServerTest test) throws Exception {
-    try (ZipArchive zip = ZipArchive.open(archive)) {
-      HttpServer server = WebMain.start(zip, archive.toString(), 0);
+    try (Explorer explorer = Explorer.open(archive)) {
+      HttpServer server = WebMain.start(explorer, 0);
       try {
         test.run(server);
       } finally {
@@ -140,6 +146,24 @@ class WebAcceptanceTest {
     serving(
         archiveWithComment("nothing relevant"),
         server -> assertEquals(404, get(server, "/somewhere-else").statusCode()));
+  }
+
+  @Test
+  void refusesToStartOnACorruptedArchive() {
+    ByteArrayOutputStream err = new ByteArrayOutputStream();
+
+    int status =
+        new WebMain()
+            .run(
+                new String[] {"--archive", CORRUPTED_ARCHIVE.toString(), "--port", "0"},
+                new PrintStream(OutputStream.nullOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(err, true, StandardCharsets.UTF_8));
+
+    assertEquals(1, status);
+    // A stack trace on the terminal is not a diagnosis: the message must be readable.
+    assertTrue(
+        err.toString(StandardCharsets.UTF_8).startsWith("Error: Cannot open archive: " + CORRUPTED_ARCHIVE),
+        err.toString(StandardCharsets.UTF_8));
   }
 
   @Test

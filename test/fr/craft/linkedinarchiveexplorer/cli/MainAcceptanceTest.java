@@ -24,6 +24,9 @@ class MainAcceptanceTest {
 
   private static final String ESC = "\u001B";
 
+  /** The versioned damaged archive (a real zip with its END header truncated away). */
+  private static final Path CORRUPTED_ARCHIVE = Path.of("test/data/corrupted.zip");
+
   private int run(String... args) {
     return run(false, args);
   }
@@ -163,6 +166,14 @@ class MainAcceptanceTest {
   @Test
   void failsWhenTheArchiveDoesNotExist() {
     assertEquals(1, run("--archive", "/no/such/archive.zip", "term"));
+  }
+
+  @Test
+  void tellsWhyACorruptedArchiveCannotBeSearched() {
+    assertEquals(1, run("--archive", CORRUPTED_ARCHIVE.toString(), "term"));
+    assertTrue(
+        err.toString(StandardCharsets.UTF_8).startsWith("Error: Cannot open archive: " + CORRUPTED_ARCHIVE),
+        err.toString(StandardCharsets.UTF_8));
   }
 
   @Test

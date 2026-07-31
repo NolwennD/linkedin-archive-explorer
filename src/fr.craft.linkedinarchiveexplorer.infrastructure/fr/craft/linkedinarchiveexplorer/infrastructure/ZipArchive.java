@@ -25,7 +25,9 @@ public final class ZipArchive implements ArchiveReader, AutoCloseable {
     try {
       return new ZipArchive(FileSystems.newFileSystem(zip));
     } catch (IOException e) {
-      throw new UncheckedIOException("Cannot open archive: " + zip, e);
+      // Relay the JDK's diagnosis ("zip END header not found", …) rather than restate it:
+      // it alone distinguishes a truncated archive from a file that is not a zip at all.
+      throw new UncheckedIOException("Cannot open archive: " + zip + " — " + e.getMessage(), e);
     }
   }
 

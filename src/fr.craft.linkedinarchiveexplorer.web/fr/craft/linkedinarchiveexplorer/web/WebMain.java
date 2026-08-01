@@ -17,6 +17,7 @@ import java.nio.file.Path;
 public final class WebMain {
 
   private static final int DEFAULT_PORT = 8080;
+  private static final String NO_BROWSER = "--no-browser";
 
   public static void main(String[] args) {
     int status = new WebMain().run(args, System.out, System.err);
@@ -48,6 +49,7 @@ public final class WebMain {
             return usage(err);
           }
         }
+        case NO_BROWSER -> { /* read by opensBrowser, nothing to collect here */ }
         default -> {
           return usage(err);
         }
@@ -70,8 +72,7 @@ public final class WebMain {
     try {
       HttpServer server = start(catalog, port);
       Runtime.getRuntime().addShutdownHook(new Thread(() -> shutDown(server, catalog)));
-      out.println(archiveLine(catalog));
-      out.println("Serving on http://localhost:" + server.getAddress().getPort() + " — Ctrl-C to stop");
+      announce(server, catalog, out, opensBrowser(args) ? new SystemBrowser() : BrowserLauncher.NONE);
       return 0;
     } catch (BindException taken) {
       // Never fall back to another port: a server listening somewhere unexpected is
@@ -103,6 +104,31 @@ public final class WebMain {
   }
 
   /**
+   * Says where to look, then takes the user there. The URL is read back from the server
+   * rather than from the requested port, so {@code --port 0} lands on the right page.
+   *
+   * <p>Printed <em>before</em> opening: if no browser can be opened, the address is still
+   * on the terminal.
+   */
+  static void announce(
+      HttpServer server, ArchiveCatalog catalog, PrintStream out, BrowserLauncher browser) {
+    String url = "http://localhost:" + server.getAddress().getPort();
+    out.println(archiveLine(catalog));
+    out.println("Serving on " + url + " — Ctrl-C to stop");
+    browser.open(url);
+  }
+
+  /** Whether to take the user to the page. Opt-out, because opening it is the point. */
+  static boolean opensBrowser(String[] args) {
+    for (String argument : args) {
+      if (NO_BROWSER.equals(argument)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * What the terminal says about the archive at start-up. An empty {@code data/} is no
    * longer a reason to refuse: the page asks for a path, so the server has to come up for
    * the user to be told anything at all.
@@ -128,7 +154,8 @@ public final class WebMain {
   }
 
   private int usage(PrintStream err) {
-    err.println("usage: linkedin-archive-explorer serve [--archive <path>] [--port <n>]");
+    err.println(
+        "usage: linkedin-archive-explorer [serve] [--archive <path>] [--port <n>] [--no-browser]");
     return 2;
   }
 }

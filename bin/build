@@ -23,6 +23,14 @@ public final class Build {
 
   private static final String JAR = "dist/linkedin-explorer.jar";
 
+  /**
+   * Pins the bytecode <em>and</em> the visible API to Java 17, whatever JDK builds. Without
+   * it the jar carries the builder's class file version — a release built on a JDK 25
+   * runner would demand a JDK 25, contradicting the documented floor. As a bonus, an
+   * accidental use of a newer API now fails here rather than in the CI's 17 branch.
+   */
+  private static final String RELEASE = "--release";
+
   public static void main(String[] args) throws IOException {
     deleteRecursively(Path.of("out"));
     deleteRecursively(Path.of("build"));
@@ -31,18 +39,18 @@ public final class Build {
     Files.createDirectories(Path.of("dist"));
 
     // 1. Modular compile — a forbidden inter-module dependency fails here.
-    runTool("javac", concat(List.of("--module-source-path", "src", "-d", "out"), javaFiles("src", false)));
+    runTool("javac", concat(List.of(RELEASE, "17", "--module-source-path", "src", "-d", "out"), javaFiles("src", false)));
 
     // 2. Flat compile (module-info excluded) for a plain classpath jar.
-    runTool("javac", concat(List.of("-d", "build/classes"), javaFiles("src", true)));
+    runTool("javac", concat(List.of(RELEASE, "17", "-d", "build/classes"), javaFiles("src", true)));
 
     // 3. Single runnable jar.
     runTool("jar", List.of("--create", "--file", JAR,
-        "--main-class", "fr.craft.linkedinarchiveexplorer.cli.Main", "-C", "build/classes", "."));
+        "--main-class", "fr.craft.linkedinarchiveexplorer.app.App", "-C", "build/classes", "."));
 
     System.out.println("Built " + JAR);
     System.out.println("Run: ./linkedin-archive-explorer [--archive <path>] [--color|--no-color] <term>  (builds on first use)");
-    System.out.println("Web: ./linkedin-archive-explorer serve [--archive <path>] [--port <n>]");
+    System.out.println("Web: ./linkedin-archive-explorer [serve] [--archive <path>] [--port <n>]");
   }
 
   /** Runs a JDK tool in-process; exits with its status if it fails. */

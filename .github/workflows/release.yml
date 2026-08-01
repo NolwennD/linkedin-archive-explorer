@@ -1,0 +1,99 @@
+name: Release
+
+# Publishes the two bundles of the binary design on a version tag. The CI workflow is left
+# alone: it keeps testing every push on JDK 17 and 25.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    name: Bundle (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # jlink only builds an image for the platform it runs on, so one runner per
+          # target — which also spares us downloading foreign JDKs for their jmods.
+          - os: ubuntu-latest
+            label: linux-x64
+          - os: macos-latest
+            label: macos-aarch64
+          - os: windows-latest
+            label: windows-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      # 25 is what ends up embedded in the image. The source floor stays 17, pinned by
+      # --release in bin/build and checked by the CI workflow — the two are not the same
+      # thing and do not move together.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Run tests
+        run: java --source 17 bin/test
+
+      - name: Package
+        run: java --source 17 bin/package ${GITHUB_REF_NAME#v}
+        shell: bash
+
+      # The only check that proves the jlink closure is complete: a missing service
+      # provider — jdk.zipfs, say — links and starts fine, then fails on the first archive.
+      - name: Smoke-test the packaged binary
+        shell: bash
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          root="dist/linkedin-archive-explorer-$version"
+          launcher="$root/bin/linkedin-archive-explorer"
+          [ -f "$launcher" ] || launcher="$root/bin/linkedin-archive-explorer.bat"
+
+          "$launcher" --archive test/data/corrupted.zip x > out.txt 2>&1 && exit 1
+          grep -q "Cannot open archive" out.txt
+
+          "$launcher" serve --no-browser --port 8099 > serve.txt 2>&1 &
+          sleep 8
+          grep -q "Serving on http://localhost:8099" serve.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.label }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # The lite bundle is platform-independent and therefore built three times over; only
+      # the Linux runner's copy is published.
+      - name: Collect
+        run: |
+          set -eu
+          mkdir -p release
+          cp artifacts/bundle-linux-x64/* release/
+          cp artifacts/bundle-macos-aarch64/*macos* release/
+          cp artifacts/bundle-windows-x64/*windows* release/
+          ls -l release
+
+      # gh comes with the runner: no third-party action anywhere in this workflow.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release/* --generate-notes --repo "$GITHUB_REPOSITORY"

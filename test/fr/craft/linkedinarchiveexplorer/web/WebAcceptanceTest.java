@@ -21,6 +21,8 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Nested;
@@ -331,6 +333,48 @@ class WebAcceptanceTest {
             assertTrue(response.body().contains("name=\"archive\" value=\"\" list="), response.body());
             assertTrue(response.body().contains("<datalist id=\"archives\">\n</datalist>"), response.body());
           });
+    }
+  }
+
+  @Nested
+  class OpeningTheBrowser {
+
+    /** A hand-written fake on the port: no mock framework, and nothing really opens. */
+    private static final class RecordingBrowser implements BrowserLauncher {
+      private final List<String> opened = new ArrayList<>();
+
+      @Override
+      public void open(String url) {
+        opened.add(url);
+      }
+    }
+
+    @Test
+    void opensThePageOnThePortThatWasActuallyBound(@TempDir Path directory) throws Exception {
+      // Port 0 means "any free port", so the URL can only be right if it is read back
+      // from the server rather than from the requested port.
+      RecordingBrowser browser = new RecordingBrowser();
+      Path archive = archiveIn(directory, "export.zip", "nothing relevant");
+
+      servingCatalog(
+          ArchiveCatalog.of(archive, directory),
+          server -> {
+            WebMain.announce(server, ArchiveCatalog.of(archive, directory), quiet(), browser);
+
+            assertEquals(
+                List.of("http://localhost:" + server.getAddress().getPort()), browser.opened);
+          });
+    }
+
+    @Test
+    void opensNothingWhenAskedNotTo() {
+      assertFalse(WebMain.opensBrowser(new String[] {"--no-browser"}));
+      assertTrue(WebMain.opensBrowser(new String[] {}));
+      assertTrue(WebMain.opensBrowser(new String[] {"--port", "9000"}));
+    }
+
+    private static PrintStream quiet() {
+      return new PrintStream(OutputStream.nullOutputStream(), true, StandardCharsets.UTF_8);
     }
   }
 

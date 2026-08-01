@@ -13,8 +13,11 @@ characters of context around each occurrence. Two grep-style options relax the m
 [docs/superpowers/specs/2026-07-24-search-options-design.md](docs/superpowers/specs/2026-07-24-search-options-design.md).
 
 It has **two interchangeable UIs over the same core**: the terminal, and a local web page
-served by the JDK's own HTTP server (`./linkedin-archive-explorer serve`). See
+served by the JDK's own HTTP server — which is what you get when no argument is given. See
 [docs/superpowers/specs/2026-07-31-web-ui-design.md](docs/superpowers/specs/2026-07-31-web-ui-design.md).
+It ships as **two bundles**: a `jlink` runtime image for whoever has no JDK, and a lite one
+(jar + launchers) for whoever has one. See
+[docs/superpowers/specs/2026-08-01-executable-binary-design.md](docs/superpowers/specs/2026-08-01-executable-binary-design.md).
 
 Full design and the rationale behind every decision:
 [docs/superpowers/specs/2026-07-22-linkedin-archive-explorer-design.md](docs/superpowers/specs/2026-07-22-linkedin-archive-explorer-design.md).
@@ -43,9 +46,12 @@ Read it before making structural changes.
 
 ## Commands
 
-The dev scripts are pure-JDK **JEP 330 single-file programs** (run via a `java --source`
-shebang — no build tool). Run them from the project root; each has a one-line `.cmd` shim
-for Windows.
+The dev scripts are **JEP 330 single-file programs** (run via a `java --source` shebang —
+no build tool). Run them from the project root; each has a one-line `.cmd` shim for
+Windows. `bin/build` and `bin/test` are pure JDK and depend on nothing; `bin/package`
+publishes rather than develops, and deliberately shells out to the system `tar` (the JDK's
+zip cannot carry the executable bit) — see
+[the binary design, § 7](docs/superpowers/specs/2026-08-01-executable-binary-design.md).
 
 - **Run all tests**: `./bin/test` — compiles the modular production tree (this is where
   the architecture is enforced), then compiles and runs the tests on the classpath with
@@ -55,14 +61,24 @@ for Windows.
 - **Run a single test class** (after `./bin/test` has compiled `out/` and `out-test/`):
   `java -jar lib/junit-platform-console-standalone-*.jar execute -cp "out-test:$(find out -mindepth 1 -maxdepth 1 -type d | tr '\n' ':')" --select-class fr.craft.linkedinarchiveexplorer.domain.SearchEngineTest`
 - **Build**: `./bin/build` — modular compile (enforcement) then packages every
-  layer into `dist/linkedin-explorer.jar`. (Windows: `bin\build.cmd`.)
+  layer into `dist/linkedin-explorer.jar`. Both compilations pin `--release 17`, so the jar
+  runs on the documented floor whatever JDK built it. (Windows: `bin\build.cmd`.)
+- **Package a release**: `./bin/package [version]` — builds, then produces the jlink runtime
+  image and the lite bundle (jar + launchers), each with its `.sha256`, in `dist/`.
+  Publishing is driven by pushing a `v*` tag; the procedure is [RELEASE.md](RELEASE.md).
+  `jdk.zipfs` must be named explicitly in the jlink roots: it is found by `ServiceLoader`,
+  so no module graph can deduce it, and without it the image starts and then fails on the
+  first archive with `Provider not found`.
 - **Run the CLI**: `./linkedin-archive-explorer [--archive <path>] [--color|--no-color] [-i|--ignore-case] [-w|--word] <term>`
   — builds the jar on first use; equivalently `java -jar dist/linkedin-explorer.jar …`.
   (default archive: most recent `.zip` in `data/`).
-- **Run the web UI**: `./linkedin-archive-explorer serve [--archive <path>] [--port <n>]`
+- **Run the web UI**: `./linkedin-archive-explorer [serve] [--archive <path>] [--port <n>] [--no-browser]`
   — serves the search page on `http://localhost:8080` (**loopback only**, never `0.0.0.0`:
-  the archive is personal). Ctrl-C to stop; no fallback if the port is taken. The launcher
-  dispatches on the `serve` argument to `…web.WebMain` instead of the jar's `Main-Class`.
+  the archive is personal) and opens it in the browser. **With no argument at all the web UI
+  is what you get**: `serve` only matters when you need `--port`. Ctrl-C to stop; no
+  fallback if the port is taken. The browser is opened through the system's own
+  `xdg-open`/`open`/`start`, never `Desktop.browse`, which would pull `java.desktop` into
+  the image for +19 MB; failing to open one is never fatal.
 - **Run performance benchmarks**: `./benchmark/bench` — the JMH harness is **not in the
   repository** (gitignored); rebuild it first per
   [docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md](docs/superpowers/specs/2026-07-28-jmh-benchmarks-design.md)
@@ -86,6 +102,7 @@ fr.craft.linkedinarchiveexplorer.cli              requires domain, application, 
                                                                           (Main + TerminalRenderer)
 fr.craft.linkedinarchiveexplorer.web              requires domain, application, launcher
                                                   + jdk.httpserver        (WebMain + HtmlRenderer)
+fr.craft.linkedinarchiveexplorer.app              requires cli, web        (App — the dispatch)
 ```
 
 - `application` must **not** `requires infrastructure`; ports (interfaces in `domain`)
@@ -99,10 +116,14 @@ fr.craft.linkedinarchiveexplorer.web              requires domain, application, 
   Naming a concrete adapter from a UI module does not compile. A new adapter is therefore
   branched in one place, for both UIs at once.
 - **`cli` and `web` are siblings — no edge between them.** Two UI adapters over the same
-  core. The `serve` sub-command is dispatched by the `linkedin-archive-explorer`
-  **launch script**, a JEP 330 single-file program that lives *outside* the module graph
-  (not to be confused with the `launcher` module). Never make one UI module require the
-  other.
+  core. The choice between them belongs to **`app`**, which requires both and is the jar's
+  `Main-Class` and the image's single jlink root; `cli` and `web` export their entry point
+  *to `app` only* (qualified export). Never make one UI module require the other — a third
+  UI joins at `app`. See
+  [the binary design](docs/superpowers/specs/2026-08-01-executable-binary-design.md).
+  The `linkedin-archive-explorer` **launch script** (a JEP 330 program outside the module
+  graph, not to be confused with the `launcher` module) no longer dispatches anything: it
+  just runs the jar.
 - **Compile as modules, run as a plain classpath jar**: `module-info.class` are ignored
   at runtime — the enforcement is purely a compile-time guarantee. `jdk.httpserver`
   resolves from the classpath without `--add-modules` (verified).

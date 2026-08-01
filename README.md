@@ -39,10 +39,44 @@ are read as-is, without extracting anything to disk:
 Articles exported by LinkedIn have no publication date: they are shown without a date, at
 the end of their group.
 
-## Prerequisites
+## Install
+
+Two bundles are published with each release. Take the one that matches what you already
+have:
+
+| Bundle | Take it if | Size |
+|---|---|---|
+| `linkedin-archive-explorer-<version>-<os>-<arch>.tar.gz` (`.zip` on Windows) | you don't know what a JDK is, or don't want one | ~22 MB |
+| `linkedin-archive-explorer-<version>-lite.tar.gz` (or `.zip`) | you already have **Java 17 or newer** | ~60 KB |
+
+Unpack it, then run `bin/linkedin-archive-explorer` — the command is the same either way.
+With no argument at all it opens the web page in your browser; give it a term and it
+searches from the terminal.
+
+Each archive ships with a `.sha256` next to it, which you can check with:
+
+```sh
+sha256sum -c linkedin-archive-explorer-<version>-linux-x64.tar.gz.sha256
+```
+
+That confirms the download is intact. It does **not** prove where the file came from — it
+is a checksum, not a signature.
+
+**On macOS**, an archive downloaded through a browser is quarantined, and the bundled Java
+runtime is not signed, so Gatekeeper will refuse to start it. Lift the quarantine on the
+folder you unpacked:
+
+```sh
+xattr -d -r com.apple.quarantine linkedin-archive-explorer-<version>
+```
+
+**On Windows**, SmartScreen warns once about an unsigned program.
+
+## Prerequisites (to build from source)
 
 **Java 17 or newer** (JDK). This is the only dependency: the program uses just the
-standard library — no build tool and no external libraries.
+standard library — no build tool and no external libraries. The published jar is compiled
+with `--release 17`, so it runs on 17 whatever JDK produced it.
 
 The JDK version is pinned in `mise.toml`. If you use [mise](https://mise.jdx.dev/), install
 it from the project directory with:
@@ -62,6 +96,9 @@ by hand — the launcher below builds it on first use.
 
 To open the project in **IntelliJ IDEA**, run `./ide/setup-intellij` once (or
 `ide\setup-intellij.cmd`) to install the config; see [docs/intellij.md](docs/intellij.md).
+
+To build the distributable bundles rather than just the jar, run `./bin/package <version>`;
+publishing them is a matter of pushing a `v*` tag — see [RELEASE.md](RELEASE.md).
 
 ## Usage
 
@@ -106,16 +143,18 @@ If the term is found nowhere, the program prints `No results for "…"`.
 
 ## Web interface
 
-Same search, same results, in a browser:
+Same search, same results, in a browser — and this is what you get when you run the program
+with **no argument at all**:
 
 ```sh
-./linkedin-archive-explorer serve
+./linkedin-archive-explorer
 ```
 
-Then open **<http://localhost:8080>**. Press Ctrl-C to stop the server.
+It serves **<http://localhost:8080>** and opens it for you. Press Ctrl-C to stop the server.
+The `serve` form is only needed to pass options:
 
 ```sh
-./linkedin-archive-explorer serve [--archive <path>] [--port <n>]
+./linkedin-archive-explorer serve [--archive <path>] [--port <n>] [--no-browser]
 ```
 
 - `--archive <path>`: same meaning as for the command line, with one addition — the file
@@ -125,6 +164,9 @@ Then open **<http://localhost:8080>**. Press Ctrl-C to stop the server.
 - `--port <n>`: the port to listen on, **8080** by default. If it is already taken the
   server says so and stops; it never silently picks another one, so the address you were
   given is always the address that works.
+- `--no-browser`: print the address instead of opening it. The browser is opened through
+  your system's own opener; if that fails — no graphical session, say — the address is
+  still printed and the server keeps running.
 
 ### What the page gives you
 

@@ -1,0 +1,255 @@
+#!/usr/bin/env -S java --source 17
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.spi.ToolProvider;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+/**
+ * Pure-JDK release packaging — a JEP 330 single-file source-code program, run as
+ * {@code ./bin/package [version]} from the project root.
+ *
+ * <p>Produces two bundles, for two audiences:
+ * <ul>
+ *   <li>the <strong>full</strong> one, a {@code jlink} runtime image, for whoever has no JDK;
+ *   <li>the <strong>lite</strong> one, the jar plus the same launchers, for whoever has one.
+ * </ul>
+ * Each comes with its {@code .sha256}.
+ *
+ * <p>Unlike {@code bin/build} and {@code bin/test}, which must run anywhere without
+ * anything installed, this one publishes: it shells out to the system {@code tar} on Unix,
+ * because the JDK's zip cannot carry the executable bit that the launchers need. That is a
+ * deliberate difference of status, not an oversight — see the binary design, § 7.
+ *
+ * <p>The class name is irrelevant in source-file mode; only the file name matters.
+ */
+public final class Package {
+
+  private static final String NAME = "linkedin-archive-explorer";
+  private static final String JAR = "dist/linkedin-explorer.jar";
+  private static final String MODULE = "fr.craft.linkedinarchiveexplorer.app";
+  private static final String MAIN = MODULE + "/" + MODULE + ".App";
+
+  public static void main(String[] args) throws IOException, InterruptedException {
+    String version = args.length > 0 ? args[0] : "dev";
+    String base = NAME + "-" + version;
+
+    build();
+
+    Path full = Path.of("dist", base);
+    Path lite = Path.of("dist", base + "-lite");
+    deleteRecursively(full);
+    deleteRecursively(lite);
+
+    image(full);
+    liteBundle(lite);
+
+    List<Path> archives = new ArrayList<>();
+    archives.add(archive(full, "dist/" + base + "-" + platform()));
+    archives.add(archive(lite, "dist/" + base + "-lite"));
+    if (!isWindows()) {
+      // The lite bundle is platform-independent, so it also ships in the format Windows
+      // users can open by double-clicking. Same content, two wrappers.
+      archives.add(zip(lite, Path.of("dist", base + "-lite.zip")));
+    }
+
+    for (Path each : archives) {
+      System.out.println(sign(each) + "  " + each);
+    }
+  }
+
+  /** The modular compile jlink needs, and the jar the lite bundle ships, in one go. */
+  private static void build() throws IOException, InterruptedException {
+    int status =
+        new ProcessBuilder("java", "--source", "17", "bin/build").inheritIO().start().waitFor();
+    if (status != 0) {
+      System.exit(status);
+    }
+  }
+
+  /**
+   * The runtime image. jlink follows the {@code requires} of the single root and works the
+   * closure out on its own — java.base plus jdk.httpserver, and nothing else.
+   *
+   * <p>{@code jdk.zipfs} has to be named, though, and it is the one thing a module graph
+   * cannot tell you: {@code ZipArchive} opens the export through
+   * {@code FileSystems.newFileSystem}, whose provider is found by {@link
+   * java.util.ServiceLoader}, not by a {@code requires}. Without it the image compiles,
+   * links, starts — and fails on the first archive with {@code Provider not found}. Naming
+   * it costs 140 kB, measured; {@code --bind-services}, the blanket alternative, would drag
+   * in charsets, locales and crypto besides.
+   */
+  private static void image(Path output) {
+    runTool(
+        "jlink",
+        List.of(
+            "--module-path", "out",
+            "--add-modules", MODULE + ",jdk.zipfs",
+            "--launcher", NAME + "=" + MAIN,
+            "--strip-debug",
+            "--no-header-files",
+            "--no-man-pages",
+            "--compress=zip-6",
+            "--output", output.toString()));
+  }
+
+  /** The jar, plus the very same command, so both bundles are documented once. */
+  private static void liteBundle(Path output) throws IOException {
+    Files.createDirectories(output.resolve("bin"));
+    Files.copy(Path.of(JAR), output.resolve("linkedin-explorer.jar"));
+
+    Path shell = output.resolve("bin").resolve(NAME);
+    Files.writeString(
+        shell,
+        """
+        #!/bin/sh
+        # Runs the explorer on the Java already installed on this machine.
+        command -v java >/dev/null 2>&1 || {
+          echo "Java is required (17 or newer), and was not found on the PATH." >&2
+          echo "Either install a JDK, or download the bundle that ships its own." >&2
+          exit 1
+        }
+        exec java -jar "$(dirname "$0")/../linkedin-explorer.jar" "$@"
+        """);
+    makeExecutable(shell);
+
+    Files.writeString(
+        output.resolve("bin").resolve(NAME + ".bat"),
+        """
+        @echo off
+        rem Runs the explorer on the Java already installed on this machine.
+        where java >nul 2>nul || (
+          echo Java is required ^(17 or newer^), and was not found on the PATH.
+          echo Either install a JDK, or download the bundle that ships its own.
+          exit /b 1
+        )
+        java -jar "%~dp0..\\linkedin-explorer.jar" %*
+        """);
+  }
+
+  /** {@code tar.gz} on Unix — it keeps the executable bit — and {@code zip} on Windows. */
+  private static Path archive(Path directory, String withoutExtension)
+      throws IOException, InterruptedException {
+    if (isWindows()) {
+      return zip(directory, Path.of(withoutExtension + ".zip"));
+    }
+    Path archive = Path.of(withoutExtension + ".tar.gz");
+    // Run from the project root, as every script here does; -C keeps the archive from
+    // carrying a "dist/" level nobody wants once unpacked.
+    ProcessBuilder tar =
+        new ProcessBuilder(
+            "tar", "czf", archive.toString(),
+            "-C", directory.getParent().toString(), directory.getFileName().toString());
+    // Without this, bsdtar on macOS slips ._* extended-attribute files into the archive.
+    tar.environment().put("COPYFILE_DISABLE", "1");
+    tar.inheritIO();
+    int status = tar.start().waitFor();
+    if (status != 0) {
+      System.err.println("tar failed (exit " + status + ")");
+      System.exit(status);
+    }
+    return archive;
+  }
+
+  private static Path zip(Path directory, Path archive) throws IOException {
+    try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(archive));
+        Stream<Path> paths = Files.walk(directory)) {
+      List<Path> files = paths.filter(Files::isRegularFile).sorted().toList();
+      for (Path file : files) {
+        String name = directory.getFileName() + "/" + directory.relativize(file).toString().replace('\\', '/');
+        out.putNextEntry(new ZipEntry(name));
+        Files.copy(file, out);
+        out.closeEntry();
+      }
+    }
+    return archive;
+  }
+
+  /**
+   * The SHA-256 of {@code archive}, written next to it in the format {@code sha256sum -c}
+   * reads. A checksum catches a corrupted download; it does not prove where the file came
+   * from, and the release page should not pretend otherwise.
+   */
+  private static String sign(Path archive) throws IOException {
+    MessageDigest digest;
+    try {
+      digest = MessageDigest.getInstance("SHA-256");
+    } catch (java.security.NoSuchAlgorithmException impossible) {
+      throw new IllegalStateException("SHA-256 is required of every JDK", impossible);
+    }
+    try (InputStream in = Files.newInputStream(archive)) {
+      byte[] buffer = new byte[16 * 1024];
+      for (int read; (read = in.read(buffer)) > 0; ) {
+        digest.update(buffer, 0, read);
+      }
+    }
+    String hex = HexFormat.of().formatHex(digest.digest());
+    Files.writeString(
+        Path.of(archive + ".sha256"), hex + "  " + archive.getFileName() + System.lineSeparator());
+    return hex;
+  }
+
+  /** {@code linux-x64}, {@code macos-aarch64}, {@code windows-x64}. */
+  private static String platform() {
+    String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+    String name = os.contains("mac") ? "macos" : os.contains("windows") ? "windows" : "linux";
+    String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
+    return name + "-" + (arch.equals("amd64") || arch.equals("x86_64") ? "x64" : arch);
+  }
+
+  private static boolean isWindows() {
+    return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows");
+  }
+
+  private static void makeExecutable(Path file) throws IOException {
+    if (isWindows()) {
+      return;
+    }
+    Set<PosixFilePermission> permissions = new java.util.HashSet<>(Files.getPosixFilePermissions(file));
+    permissions.add(PosixFilePermission.OWNER_EXECUTE);
+    permissions.add(PosixFilePermission.GROUP_EXECUTE);
+    permissions.add(PosixFilePermission.OTHERS_EXECUTE);
+    Files.setPosixFilePermissions(file, permissions);
+  }
+
+  /** Runs a JDK tool in-process; exits with its status if it fails. */
+  private static void runTool(String name, List<String> arguments) {
+    ToolProvider tool =
+        ToolProvider.findFirst(name).orElseThrow(() -> new IllegalStateException("JDK tool not found: " + name));
+    int status = tool.run(System.out, System.err, arguments.toArray(String[]::new));
+    if (status != 0) {
+      System.err.println(name + " failed (exit " + status + ")");
+      System.exit(status);
+    }
+  }
+
+  private static void deleteRecursively(Path root) throws IOException {
+    if (!Files.exists(root)) {
+      return;
+    }
+    try (Stream<Path> paths = Files.walk(root)) {
+      paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+        try {
+          Files.delete(path);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      });
+    }
+  }
+}

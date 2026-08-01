@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,7 +32,7 @@ public final class ArchiveLocator {
     }
     try (Stream<Path> files = Files.list(directory)) {
       return files
-          .filter(path -> path.getFileName().toString().toLowerCase().endsWith(".zip"))
+          .filter(ArchiveLocator::isZip)
           .sorted(Comparator.comparing(ArchiveLocator::recencyOf).reversed())
           .toList();
     } catch (IOException e) {
@@ -43,6 +44,16 @@ public final class ArchiveLocator {
   public static Optional<Path> mostRecent(Path directory) {
     List<Path> archives = all(directory);
     return archives.isEmpty() ? Optional.empty() : Optional.of(archives.get(0));
+  }
+
+  /**
+   * A file name is an extension, not a sentence, so it is lowercased with {@link
+   * Locale#ROOT} rather than the user's locale. Turkish lowercases {@code I} to the
+   * dotless {@code ı}: with the default locale, {@code EXPORT.ZIP} would end in
+   * {@code .zıp} and vanish from the listing on a Turkish machine only.
+   */
+  private static boolean isZip(Path path) {
+    return path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip");
   }
 
   private static Instant recencyOf(Path zip) {

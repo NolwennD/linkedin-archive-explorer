@@ -125,7 +125,9 @@ java -jar dist/linkedin-explorer.jar [--archive <path>] [--color|--no-color] <te
   falling back to the last-modified time. So the usual workflow is: drop your export into
   `data/` and run the command with just a search term.
 - `-i` / `--ignore-case`: ignore case, so `date` also finds `Date` and `DATE`. **Accents
-  remain significant**: `developpe` still does not find `développe`.
+  remain significant**: `developpe` still does not find `développe`. So is any letter that
+  merely looks like another — the Turkish `ı` and `İ` are letters of their own, and `isi`
+  does not find `ısı`, exactly as with `grep -i`.
 - `-w` / `--word`: match **whole words only**, so `dev` no longer matches inside
   `developpeur`. The short flags combine: `-iw` (or `-wi`).
 - `--color` / `--no-color`: force or disable colors and clickable links. **Enabled by

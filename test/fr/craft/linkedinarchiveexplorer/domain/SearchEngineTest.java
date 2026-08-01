@@ -86,6 +86,22 @@ class SearchEngineTest {
     void staysSensitiveToAccents() {
       assertTrue(searchIgnoringCase("developpe", comment("je développe")).isEmpty());
     }
+
+    @ParameterizedTest(name = "no match: {2}")
+    @CsvSource({
+      "isi, ısı, the dotless ı is a letter of its own and not an i",
+      "isi, İSİ, the dotted İ carries its dot the way an accent carries its own",
+      "ISI, ısı, nor does the capital I reach the dotless ı"
+    })
+    void doesNotConflateTheTurkishIWithTheLatinOne(String term, String text, String reason) {
+      assertTrue(searchIgnoringCase(term, comment(text)).isEmpty());
+    }
+
+    @Test
+    void stillIgnoresCaseBetweenTheTurkishLettersThemselves() {
+      assertEquals(1, searchIgnoringCase("ısı", comment("une ısı ici")).size());
+      assertEquals(1, searchIgnoringCase("İSTANBUL", comment("İstanbul")).size());
+    }
   }
 
   @Nested

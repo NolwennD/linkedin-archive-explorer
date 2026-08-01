@@ -10,6 +10,9 @@ import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Locale;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -81,6 +84,35 @@ class ArchiveLocatorTest {
       Files.createFile(dir.resolve("Complete_LinkedInDataExport_07-21-2026.zip"));
 
       assertEquals(ArchiveLocator.mostRecent(dir).orElseThrow(), ArchiveLocator.all(dir).get(0));
+    }
+  }
+
+  /**
+   * The extension test must not go through the default locale. In Turkish, lowercasing
+   * {@code I} yields the dotless {@code ı}, so {@code ".ZIP"} becomes {@code ".zıp"} and
+   * the archive silently disappears from the listing — on the user's machine only.
+   */
+  @Nested
+  class UnderATurkishLocale {
+
+    private Locale previous;
+
+    @BeforeEach
+    void switchLocale() {
+      previous = Locale.getDefault();
+      Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+    }
+
+    @AfterEach
+    void restoreLocale() {
+      Locale.setDefault(previous);
+    }
+
+    @Test
+    void stillRecognisesAnUppercaseExtension(@TempDir Path dir) throws IOException {
+      Path zip = Files.createFile(dir.resolve("EXPORT.ZIP"));
+
+      assertEquals(List.of(zip), ArchiveLocator.all(dir));
     }
   }
 }

@@ -27,6 +27,35 @@ trivial à ajouter plus tard).
 
 - `Date` = `date` = `DATE`
 - `developpe` ≠ `développe`
+- `isi` ≠ `ısı` et `isi` ≠ `İSİ` *(ajouté le 2026-08-01, voir ci-dessous)*
+
+#### Le `I` turc — correction du 2026-08-01
+Le `ı` sans point (U+0131) et le `İ` avec point (U+0130) sont des **lettres à part
+entière** de l'alphabet turc, pas des variantes du `i` latin. La règle « seule la casse
+est ignorée » leur applique donc le même traitement qu'aux accents : ils ne rencontrent
+que leur propre paire de casse.
+
+L'implémentation initiale s'appuyait sur `String.regionMatches(true, …)`, qui rapproche
+deux caractères dès que leurs majuscules **ou** leurs minuscules coïncident. Or
+`Character.toUpperCase('ı')` vaut `'I'` et `Character.toLowerCase('İ')` vaut `'i'` : les
+quatre lettres se rejoignaient par ce pivot, et `-i` remontait `ısı` pour une recherche de
+`isi`. `grep -i` ne le fait pas ; l'outil ne le fait plus non plus.
+
+La comparaison passe désormais par une fonction de repliement,
+`minuscule(majuscule(c))`, dont les deux lettres turques sont exclues. Étant une vraie
+fonction, elle rend la relation **transitive**, ce que l'ancien « ou » n'était pas. Sur
+l'ensemble du BMP le changement se réduit à neuf paires : les quatre confusions turques
+disparaissent, et le thêta grec `ϑ`/`ϴ` se rapproche — ce que fait le repliement Unicode
+de référence.
+
+Rien de tout cela ne dépend de la locale : c'est une propriété des caractères, pas du
+lecteur, et les résultats sont les mêmes partout.
+
+La locale, elle, était en cause dans un **second** défaut trouvé le même jour, ailleurs :
+`ArchiveLocator` mettait l'extension en minuscules sans préciser de locale. Sur une
+machine turque `EXPORT.ZIP` devenait `.zıp`, et l'archive disparaissait simplement de la
+liste — chez cet utilisateur seulement. Un nom de fichier n'est pas une phrase :
+`Locale.ROOT`.
 
 ### `-w` : mot entier, caractères de mot Unicode
 Un « caractère de mot » est une **lettre Unicode**, un **chiffre**, ou `_`

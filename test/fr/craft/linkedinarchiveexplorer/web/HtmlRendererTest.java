@@ -24,7 +24,14 @@ class HtmlRendererTest {
 
   private static final LocalDate A_DAY = LocalDate.of(2024, 11, 6);
 
-  private final HtmlRenderer renderer = new HtmlRenderer("data/export.zip");
+  private static final ArchiveField ONE_ARCHIVE =
+      new ArchiveField(List.of("data/export.zip"), "data/export.zip", "");
+
+  private final HtmlRenderer renderer = new HtmlRenderer();
+
+  private String emptyForm() {
+    return renderer.renderForm("", false, false, ONE_ARCHIVE);
+  }
 
   private static Excerpt excerpt(String before, String match, String after) {
     return new Excerpt(before, new Match(0, match.length(), match), after);
@@ -44,7 +51,7 @@ class HtmlRendererTest {
   }
 
   private String render(SearchTerm term, SearchResults results) {
-    return renderer.render(term, results);
+    return renderer.render(term, results, ONE_ARCHIVE);
   }
 
   private String renderFound(String term) {
@@ -66,11 +73,6 @@ class HtmlRendererTest {
     @Test
     void putsTheSearchedTermFirstInTheTitle() {
       assertTrue(renderFound("café").contains("<title>café — LinkedIn archive explorer</title>"));
-    }
-
-    @Test
-    void namesTheArchiveInTheFooter() {
-      assertTrue(renderFound("foo").contains("<footer>Archive: data/export.zip</footer>"));
     }
 
     @Test
@@ -216,6 +218,17 @@ class HtmlRendererTest {
     }
 
     @Test
+    void namesTheOptionRowLikeTheSearchAndArchiveOnes() {
+      // A group of checkboxes has no single control to point at, so the label is tied to
+      // it by aria-labelledby rather than by "for".
+      String page = renderFound("foo");
+
+      assertTrue(page.contains("<span id=\"options-label\">Options</span>"), page);
+      assertTrue(
+          page.contains("<div class=\"options\" role=\"group\" aria-labelledby=\"options-label\">"), page);
+    }
+
+    @Test
     void leavesBothOptionsUntickedForALiteralTerm() {
       String page = renderFound("foo");
 
@@ -263,11 +276,152 @@ class HtmlRendererTest {
   }
 
   @Nested
+  class ArchiveField_ {
+
+    private final ArchiveField threeArchives =
+        new ArchiveField(List.of("data/new.zip", "data/mid.zip", "data/old.zip"), "data/mid.zip", "");
+
+    private String pageWithThreeArchives() {
+      return renderer.render(
+          SearchTerm.literal("foo"), oneComment(excerpt("a ", "foo", " b")), threeArchives);
+    }
+
+    @Test
+    void isARequiredTextFieldCarryingTheCurrentPath() {
+      assertTrue(
+          pageWithThreeArchives()
+              .contains(
+                  "<input type=\"text\" id=\"archive\" name=\"archive\" value=\"data/mid.zip\""
+                      + " list=\"archives\" required"),
+          pageWithThreeArchives());
+    }
+
+    @Test
+    void suggestsTheArchivesOfTheDirectoryInTheOrderReceived() {
+      String page = pageWithThreeArchives();
+
+      assertTrue(page.contains("<datalist id=\"archives\">"), page);
+      assertEquals(
+          List.of("data/new.zip", "data/mid.zip", "data/old.zip"),
+          page.lines().filter(line -> line.startsWith("<option")).map(HtmlRendererTest::optionValue).toList());
+    }
+
+    @Test
+    void showsWhatAPathLooksLikeWhileTheFieldIsEmpty() {
+      assertTrue(
+          pageWithThreeArchives()
+              .contains("placeholder=\"/path/to/Complete_LinkedInDataExport.zip\""),
+          pageWithThreeArchives());
+    }
+
+    @Test
+    void explainsWhereThePathComesFromAndSaysSoToScreenReadersToo() {
+      String page = pageWithThreeArchives();
+
+      assertTrue(page.contains("aria-describedby=\"archive-hint\""), page);
+      assertTrue(
+          page.contains(
+              "<p class=\"hint\" id=\"archive-hint\">Type or paste the <strong>absolute</strong> path"
+                  + " to a LinkedIn export. The archives found in data/ are suggested.</p>"),
+          page);
+    }
+
+    @Test
+    void keepsTheHintWhenThereIsNothingToSuggest() {
+      // That is exactly when it is needed: nothing in data/, so the path must be typed.
+      assertTrue(
+          renderer.renderForm("", false, false, new ArchiveField(List.of(), "", "")).contains("archive-hint"));
+    }
+
+    @Test
+    void leavesTheFieldEmptyWhenThereIsNoArchiveToPropose() {
+      String page = renderer.renderForm("", false, false, new ArchiveField(List.of(), "", ""));
+
+      assertTrue(page.contains("name=\"archive\" value=\"\" list=\"archives\" required"), page);
+      assertTrue(page.contains("<datalist id=\"archives\">\n</datalist>"), page);
+    }
+
+    @Test
+    void submitsTheArchiveWithTheSearchItself() {
+      // One form, one GET: the archive travels with the term rather than on its own.
+      String page = pageWithThreeArchives();
+      int form = page.indexOf("<form method=\"get\"");
+      int field = page.indexOf("id=\"archive\"");
+
+      assertTrue(form >= 0 && field > form && field < page.indexOf("</form>"), page);
+    }
+
+    @Test
+    void putsTheArchiveLabelAndItsFieldSideBySideInTheGrid() {
+      // Direct children of the form: each label/control pair lands on its own grid row,
+      // and the control shares one column with the search field, hence one width.
+      assertTrue(
+          pageWithThreeArchives().contains("<label for=\"archive\">Archive</label>\n<input type=\"text\""),
+          pageWithThreeArchives());
+    }
+
+    @Test
+    void offersTheFieldOnTheLandingPageToo() {
+      assertTrue(
+          renderer.renderForm("", false, false, threeArchives).contains("<option value=\"data/mid.zip\">"));
+    }
+
+    @Test
+    void escapesThePathInBothTheFieldAndTheSuggestions() {
+      // A file may legitimately be named this way, and it must not become live markup.
+      String hostile = "<script>\"x\".zip";
+      ArchiveField field = new ArchiveField(List.of(hostile), hostile, "");
+
+      String page = renderer.renderForm("", false, false, field);
+
+      assertEquals(2, page.split("&lt;script&gt;&quot;x&quot;\\.zip", -1).length - 1, page);
+      assertFalse(page.contains("<script"), "an archive name must never inject a script tag");
+    }
+  }
+
+  @Nested
+  class ArchiveError {
+
+    private String pageWithError(String error) {
+      return renderer.renderForm("foo", false, false, new ArchiveField(List.of(), "data/typo.zip", error));
+    }
+
+    @Test
+    void showsTheMessageAndKeepsThePathSoItCanBeCorrected() {
+      String page = pageWithError("Cannot read archive: data/typo.zip");
+
+      assertTrue(
+          page.contains("<p class=\"error\" role=\"alert\">Cannot read archive: data/typo.zip</p>"), page);
+      assertTrue(page.contains("value=\"data/typo.zip\""), page);
+    }
+
+    @Test
+    void keepsTheSearchTermSoItNeedNotBeTypedAgain() {
+      assertTrue(pageWithError("Cannot read archive: data/typo.zip").contains("value=\"foo\""));
+    }
+
+    @Test
+    void showsNoBannerWhenThereIsNoError() {
+      assertFalse(pageWithError("").contains("class=\"error\""), pageWithError(""));
+    }
+
+    @Test
+    void escapesTheMessage() {
+      assertTrue(pageWithError("<b>boom</b>").contains("&lt;b&gt;boom&lt;/b&gt;"), pageWithError("<b>"));
+    }
+  }
+
+  private static String optionValue(String line) {
+    int start = line.indexOf("value=\"") + "value=\"".length();
+    return line.substring(start, line.indexOf('"', start));
+  }
+
+  @Nested
   class LandingPage {
 
     @Test
     void hasAnEmptyInputAndNoResultMessage() {
-      String page = renderer.renderEmptyForm();
+      String page = emptyForm();
 
       assertTrue(page.contains("value=\"\""), page);
       assertFalse(page.contains("No results"), page);
@@ -275,13 +429,13 @@ class HtmlRendererTest {
 
     @Test
     void titlesThePageWithTheApplicationNameAlone() {
-      assertTrue(renderer.renderEmptyForm().contains("<title>LinkedIn archive explorer</title>"));
+      assertTrue(emptyForm().contains("<title>LinkedIn archive explorer</title>"));
     }
 
     @Test
     void refusesToSubmitAnEmptyTerm() {
       // `required` disables the search the HTML-native way — no JavaScript involved.
-      assertTrue(renderer.renderEmptyForm().contains("value=\"\" required"), renderer.renderEmptyForm());
+      assertTrue(emptyForm().contains("value=\"\" required"), emptyForm());
     }
   }
 

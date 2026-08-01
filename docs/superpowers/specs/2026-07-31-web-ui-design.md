@@ -387,9 +387,12 @@ la présence de `requires jdk.httpserver` sont vérifiées à la compilation, sa
 
 - **Pagination et plafond de résultats** — la page défile ; on verra si ça gêne un jour.
 - **Cache** — les benchmarks disent que ça n'en vaut pas la peine (§ 5).
-- **Sélecteur d'archive dans la page** — impliquerait d'ouvrir et fermer des `ZipArchive`
-  au fil des requêtes, donc de l'état mutable partagé, pour un besoin rare : redémarrer
-  avec `--archive` suffit.
+- ~~**Sélecteur d'archive dans la page**~~ — écarté ici (« impliquerait d'ouvrir et fermer
+  des `ZipArchive` au fil des requêtes, donc de l'état mutable partagé, pour un besoin
+  rare : redémarrer avec `--archive` suffit »), puis **réalisé** par
+  [le choix de l'archive dans l'UI web](2026-08-01-web-archive-selection-design.md).
+  Ce n'est pas le raisonnement qui était faux, c'est son contexte qui a changé : « redémarrer
+  avec `--archive` » suppose un terminal, ce qu'un binaire double-cliqué n'a pas.
 - **JavaScript** (recherche au fil de la frappe, rechargement partiel) — du code front non
   couvert par la suite JUnit, pour un confort marginal sur une page qui répond en ~10 ms.
 - **API JSON** — il faudrait sérialiser à la main, sans bibliothèque, et versionner un

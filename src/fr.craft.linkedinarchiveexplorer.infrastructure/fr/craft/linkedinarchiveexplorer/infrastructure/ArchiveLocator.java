@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -23,17 +24,25 @@ public final class ArchiveLocator {
 
   private ArchiveLocator() {}
 
-  public static Optional<Path> mostRecent(Path directory) {
+  /** Every archive of {@code directory}, most recent first. */
+  public static List<Path> all(Path directory) {
     if (!Files.isDirectory(directory)) {
-      return Optional.empty();
+      return List.of();
     }
     try (Stream<Path> files = Files.list(directory)) {
       return files
           .filter(path -> path.getFileName().toString().toLowerCase().endsWith(".zip"))
-          .max(Comparator.comparing(ArchiveLocator::recencyOf));
+          .sorted(Comparator.comparing(ArchiveLocator::recencyOf).reversed())
+          .toList();
     } catch (IOException e) {
       throw new UncheckedIOException("Cannot list archives in " + directory, e);
     }
+  }
+
+  /** The head of {@link #all}, when there is one. */
+  public static Optional<Path> mostRecent(Path directory) {
+    List<Path> archives = all(directory);
+    return archives.isEmpty() ? Optional.empty() : Optional.of(archives.get(0));
   }
 
   private static Instant recencyOf(Path zip) {

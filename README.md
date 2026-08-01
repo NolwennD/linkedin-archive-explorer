@@ -118,8 +118,10 @@ Then open **<http://localhost:8080>**. Press Ctrl-C to stop the server.
 ./linkedin-archive-explorer serve [--archive <path>] [--port <n>]
 ```
 
-- `--archive <path>`: same meaning as for the command line — omitted, the most recent
-  `.zip` in `data/` is used.
+- `--archive <path>`: same meaning as for the command line, with one addition — the file
+  is what the page's archive field starts on, and it is suggested there. Omitted, the most
+  recent `.zip` in `data/` is used; if `data/` is empty the server still starts and the
+  page asks you for a path.
 - `--port <n>`: the port to listen on, **8080** by default. If it is already taken the
   server says so and stops; it never silently picks another one, so the address you were
   given is always the address that works.
@@ -128,16 +130,24 @@ Then open **<http://localhost:8080>**. Press Ctrl-C to stop the server.
 
 - A **search field** and the two option checkboxes (*Ignore case*, *Whole word*), matching
   the `-i` and `-w` flags.
+- An **archive field**: a path you can type or paste, with the `.zip` files of `data/`
+  offered as suggestions (most recent first). It starts filled with the most recent one, it
+  sits in the search form — so you switch archive by running a search — and the choice is
+  **remembered** in a cookie, so the next start-up opens the archive you last used. A path
+  that does not open comes back with the reason, the path kept so you can fix it.
 - Results **grouped by type**, each group **collapsible** — handy when a common term
   returns hundreds of comments and buries everything else. The count stays visible on the
   collapsed group.
-- The search lives **entirely in the URL** (`/?q=café&i=on`), so a search is bookmarkable
-  and shareable, and the browser's back button becomes your search history.
+- The search lives **entirely in the URL** (`/?q=café&i=on&archive=export.zip`), so a
+  search is bookmarkable and shareable, and the browser's back button becomes your search
+  history. An `archive=` in the URL always wins over the remembered one.
 
 ### Privacy
 
 The server listens on **`127.0.0.1` only** — never on your network interface. Your export
 is personal data, so it stays on your machine, and nobody else on the network can reach it.
+Note that the archive field takes any path, so the server can open any file you can read —
+the same reach `--archive` already has, on a loopback server meant for one person.
 There is **no JavaScript** and no file serving: the page is plain HTML built server-side,
 and everything coming out of the archive is escaped, so a post of yours containing markup
 is shown as text rather than executed.
@@ -147,3 +157,6 @@ is shown as text rather than executed.
 Each LinkedIn export is a full snapshot. If `data/` contains several `.zip` files, the
 program automatically uses the **most recent** one (date read from the file name, otherwise
 the last-modified time). Use `--archive` to target a specific one.
+
+In the web UI you do not have to choose up front: the page suggests them all and lets you
+switch between searches — or point at an archive kept anywhere else (see above).

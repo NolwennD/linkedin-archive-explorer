@@ -80,7 +80,8 @@ forbids cycles.
 fr.craft.linkedinarchiveexplorer.domain          requires nothing        (model + SearchEngine + ports)
 fr.craft.linkedinarchiveexplorer.application      requires domain         (SearchContentsService)
 fr.craft.linkedinarchiveexplorer.infrastructure   requires domain         (zip/CSV/HTML adapters)
-fr.craft.linkedinarchiveexplorer.launcher         requires the three above (Explorer — composition root)
+fr.craft.linkedinarchiveexplorer.launcher         requires the three above (Explorer + ArchiveCatalog
+                                                                          — composition root)
 fr.craft.linkedinarchiveexplorer.cli              requires domain, application, launcher
                                                                           (Main + TerminalRenderer)
 fr.craft.linkedinarchiveexplorer.web              requires domain, application, launcher
@@ -91,9 +92,12 @@ fr.craft.linkedinarchiveexplorer.web              requires domain, application, 
   are wired in **`launcher` only**, the single composition root. See
   [its design](docs/superpowers/specs/2026-07-31-composition-root-design.md).
 - **No UI module may `requires infrastructure`.** `Explorer.open(…)` hands `cli` and `web`
-  a wired `SearchContentsService` over an open archive; naming a concrete adapter from a
-  UI module does not compile. A new adapter is therefore branched in one place, for both
-  UIs at once.
+  a wired `SearchContentsService` over an open archive — and `ArchiveCatalog` does the same
+  for *several* archives, listing them and keeping one open, which is why the web UI can
+  offer an archive selector without ever naming a file-system adapter
+  ([its design](docs/superpowers/specs/2026-08-01-web-archive-selection-design.md)).
+  Naming a concrete adapter from a UI module does not compile. A new adapter is therefore
+  branched in one place, for both UIs at once.
 - **`cli` and `web` are siblings — no edge between them.** Two UI adapters over the same
   core. The `serve` sub-command is dispatched by the `linkedin-archive-explorer`
   **launch script**, a JEP 330 single-file program that lives *outside* the module graph

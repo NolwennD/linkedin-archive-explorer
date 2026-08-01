@@ -1,8 +1,8 @@
 package fr.craft.linkedinarchiveexplorer.web;
 
 import com.sun.net.httpserver.HttpServer;
+import fr.craft.linkedinarchiveexplorer.launcher.ArchiveCatalog;
 import fr.craft.linkedinarchiveexplorer.launcher.ArchiveUnavailableException;
-import fr.craft.linkedinarchiveexplorer.launcher.Explorer;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.BindException;
@@ -12,7 +12,7 @@ import java.nio.file.Path;
 
 /**
  * Web entry point — the twin of the CLI's {@code Main}, putting the same
- * {@link Explorer} behind an HTTP server instead of a terminal.
+ * {@link ArchiveCatalog} behind an HTTP server instead of a terminal.
  */
 public final class WebMain {
 
@@ -54,9 +54,9 @@ public final class WebMain {
       }
     }
 
-    Explorer explorer;
+    ArchiveCatalog catalog;
     try {
-      explorer = Explorer.open(archivePath);
+      catalog = ArchiveCatalog.of(archivePath);
     } catch (ArchiveUnavailableException unavailable) {
       // Its message is already written for the user: no "Error: " prefix.
       err.println(unavailable.getMessage());
@@ -68,9 +68,9 @@ public final class WebMain {
     }
 
     try {
-      HttpServer server = start(explorer, port);
-      Runtime.getRuntime().addShutdownHook(new Thread(() -> shutDown(server, explorer)));
-      out.println("Using archive: " + explorer.archive());
+      HttpServer server = start(catalog, port);
+      Runtime.getRuntime().addShutdownHook(new Thread(() -> shutDown(server, catalog)));
+      out.println(archiveLine(catalog));
       out.println("Serving on http://localhost:" + server.getAddress().getPort() + " — Ctrl-C to stop");
       return 0;
     } catch (BindException taken) {
@@ -78,11 +78,11 @@ public final class WebMain {
       // worse than one that plainly refuses to start.
       err.println(
           "Port " + port + " already in use — try: ./linkedin-archive-explorer serve --port " + (port + 1));
-      closeQuietly(explorer);
+      closeQuietly(catalog);
       return 1;
     } catch (IOException | RuntimeException failure) {
       err.println("Error: " + failure.getMessage());
-      closeQuietly(explorer);
+      closeQuietly(catalog);
       return 1;
     }
   }
@@ -92,25 +92,36 @@ public final class WebMain {
    * The caller keeps ownership of {@code explorer}. Port {@code 0} asks the system for a
    * free port; read the one actually bound from {@code server.getAddress()}.
    */
-  static HttpServer start(Explorer explorer, int port) throws IOException {
+  static HttpServer start(ArchiveCatalog catalog, int port) throws IOException {
     HttpServer server =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
-    server.createContext(
-        "/", new SearchHandler(explorer.service(), new HtmlRenderer(explorer.archive().toString())));
+    server.createContext("/", new SearchHandler(catalog, new HtmlRenderer()));
     // A single local user: sequential handling means no concurrency over the shared zip.
     server.setExecutor(null);
     server.start();
     return server;
   }
 
-  private static void shutDown(HttpServer server, Explorer explorer) {
-    server.stop(0);
-    closeQuietly(explorer);
+  /**
+   * What the terminal says about the archive at start-up. An empty {@code data/} is no
+   * longer a reason to refuse: the page asks for a path, so the server has to come up for
+   * the user to be told anything at all.
+   */
+  static String archiveLine(ArchiveCatalog catalog) {
+    return catalog
+        .resolve("", "")
+        .map(archive -> "Using archive: " + archive)
+        .orElse("No archive found — the page will ask for one.");
   }
 
-  private static void closeQuietly(Explorer explorer) {
+  private static void shutDown(HttpServer server, ArchiveCatalog catalog) {
+    server.stop(0);
+    closeQuietly(catalog);
+  }
+
+  private static void closeQuietly(ArchiveCatalog catalog) {
     try {
-      explorer.close();
+      catalog.close();
     } catch (Exception ignored) {
       // Nothing useful left to do while shutting down.
     }

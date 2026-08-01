@@ -28,8 +28,16 @@ public final class HtmlRenderer {
       h1 { font-size: 1.1rem; }
       h2 { display: inline; font-size: .95rem; letter-spacing: .08em; text-transform: uppercase; }
       h3 { font-size: .8rem; font-weight: normal; margin: 1.1rem 0 .1rem; overflow-wrap: anywhere; }
-      label { margin-right: .75rem; }
-      input[type=search] { min-width: 16rem; padding: .3rem; }
+      form { align-items: center; display: grid; gap: .45rem .75rem; grid-template-columns: max-content minmax(0, 1fr) max-content; }
+      input[type=search], select { padding: .3rem; width: 100%; }
+      .options { display: flex; flex-wrap: wrap; gap: .3rem 1rem; grid-column: 2 / -1; }
+      /* An overflowing path is shown by its end: the file name identifies it, /home/… does not.
+         text-align keeps a short path against the left edge, and :not(:focus) hands the field
+         back in plain left-to-right as soon as it is being edited. */
+      #archive:not(:focus) { direction: rtl; text-align: left; }
+      .error { color: #b3261e; grid-column: 2 / -1; margin: 0; }
+      .hint { font-size: .78rem; grid-column: 2 / -1; margin: 0; opacity: .55; }
+      @media (prefers-color-scheme: dark) { .error { color: #f2b8b5; } }
       summary { cursor: pointer; margin: 1.75rem 0 .25rem; }
       .count { opacity: .55; }
       time { font-size: .78rem; opacity: .55; }
@@ -39,29 +47,25 @@ public final class HtmlRenderer {
       footer { border-top: 1px solid; font-size: .78rem; margin-top: 2.5rem; opacity: .55; padding-top: .5rem; }
       """;
 
-  private final String archiveLabel;
-
-  public HtmlRenderer(String archiveLabel) {
-    if (archiveLabel == null) {
-      throw new IllegalArgumentException("A renderer must know which archive it reports on");
-    }
-    this.archiveLabel = archiveLabel;
+  /**
+   * The form alone, no search performed: the landing page, and the page that comes back
+   * when the archive did not open — hence the search options, which must survive that.
+   */
+  public String renderForm(String query, boolean ignoreCase, boolean wholeWord, ArchiveField archives) {
+    return page(query, ignoreCase, wholeWord, "", archives);
   }
 
-  /** The landing page: an empty form, no search performed. */
-  public String renderEmptyForm() {
-    return page("", false, false, "");
-  }
-
-  public String render(SearchTerm term, SearchResults results) {
+  public String render(SearchTerm term, SearchResults results, ArchiveField archives) {
     return page(
         term.value(),
         term.caseSensitivity() == CaseSensitivity.INSENSITIVE,
         term.wordScope() == WordScope.WHOLE_WORD,
-        results.groups().isEmpty() ? noResults(term) : groups(results));
+        results.groups().isEmpty() ? noResults(term) : groups(results),
+        archives);
   }
 
-  private String page(String query, boolean ignoreCase, boolean wholeWord, String main) {
+  private String page(
+      String query, boolean ignoreCase, boolean wholeWord, String main, ArchiveField archives) {
     return """
         <!DOCTYPE html>
         <html lang="en">
@@ -79,15 +83,17 @@ public final class HtmlRenderer {
         <form method="get" action="/">
         <label for="q">Search</label>
         <input type="search" id="q" name="q" value="%s" required autofocus>
+        <button type="submit">Search</button>
+        <span id="options-label">Options</span>
+        <div class="options" role="group" aria-labelledby="options-label">
         <label><input type="checkbox" name="i"%s> Ignore case</label>
         <label><input type="checkbox" name="w"%s> Whole word</label>
-        <button type="submit">Search</button>
-        </form>
+        </div>
+        %s</form>
         </search>
         </header>
         <main>
         %s</main>
-        <footer>Archive: %s</footer>
         </body>
         </html>
         """
@@ -98,8 +104,38 @@ public final class HtmlRenderer {
             escape(query),
             checked(ignoreCase),
             checked(wholeWord),
-            main,
-            escape(archiveLabel));
+            archiveSelector(archives),
+            main);
+  }
+
+  /**
+   * The field rides inside the search form, so changing archive and searching are one GET
+   * — no JavaScript, no server-side "current archive", and the URL says everything. Free
+   * text, because an archive may live anywhere; the {@code <datalist>} merely suggests the
+   * ones that were found, and {@code required} is what asks for a path when none was.
+   */
+  private static String archiveSelector(ArchiveField archives) {
+    StringBuilder options = new StringBuilder();
+    for (String suggestion : archives.suggestions()) {
+      options.append("<option value=\"%s\">\n".formatted(escape(suggestion)));
+    }
+    return """
+        %s<label for="archive">Archive</label>
+        <input type="text" id="archive" name="archive" value="%s" list="archives" required\
+         placeholder="/path/to/Complete_LinkedInDataExport.zip" aria-describedby="archive-hint">
+        <datalist id="archives">
+        %s</datalist>
+        <p class="hint" id="archive-hint">Type or paste the <strong>absolute</strong> path\
+         to a LinkedIn export. The archives found in data/ are suggested.</p>
+        """
+        .formatted(error(archives.error()), escape(archives.value()), options);
+  }
+
+  /** Above the field it is about, so the correction happens where the mistake shows. */
+  private static String error(String message) {
+    return message.isEmpty()
+        ? ""
+        : "<p class=\"error\" role=\"alert\">%s</p>\n".formatted(escape(message));
   }
 
   /** The term comes first, so a browser tab or a history entry identifies the search. */

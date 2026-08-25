@@ -25,7 +25,7 @@ public final class SharesContentSource implements ContentSource {
 
   private List<Content> toContents(String csv) {
     List<Content> contents = new ArrayList<>();
-    for (CsvRow row : Csv.parse(csv).rows()) {
+    for (CsvRow row : Csv.parse(csv)) {
       String url = row.get("ShareLink");
       if (!url.isBlank()) {
         contents.add(

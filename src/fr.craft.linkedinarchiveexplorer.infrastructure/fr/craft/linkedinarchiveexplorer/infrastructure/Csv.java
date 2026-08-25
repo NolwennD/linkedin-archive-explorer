@@ -8,24 +8,20 @@ import java.util.List;
  * quotes, embedded commas and newlines, and CRLF or LF record separators. Blank lines
  * are skipped; surrounding spaces are preserved.
  */
-public final class Csv {
+final class Csv {
 
   private Csv() {}
 
-  public static CsvTable parse(String content) {
+  static List<CsvRow> parse(String content) {
     List<List<String>> records = parseRecords(content);
     if (records.isEmpty()) {
-      return new CsvTable(List.of(), List.of());
+      return List.of();
     }
     List<String> headers = records.get(0);
-    List<CsvRow> rows = new ArrayList<>();
-    for (int r = 1; r < records.size(); r++) {
-      rows.add(new CsvRow(headers, records.get(r)));
-    }
-    return new CsvTable(headers, rows);
+    return records.stream().skip(1).map(row -> new CsvRow(headers, row)).toList();
   }
 
-  public static List<List<String>> parseRecords(String content) {
+  static List<List<String>> parseRecords(String content) {
     List<List<String>> records = new ArrayList<>();
     List<String> fields = new ArrayList<>();
     StringBuilder field = new StringBuilder();

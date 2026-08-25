@@ -2,7 +2,6 @@ package fr.craft.linkedinarchiveexplorer.web;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -22,21 +21,7 @@ public record Cookies(Map<String, String> values) {
 
   /** Parses a {@code Cookie} header; {@code null} — no cookie at all — yields none. */
   public static Cookies parse(String header) {
-    Map<String, String> values = new LinkedHashMap<>();
-    if (header == null) {
-      return new Cookies(values);
-    }
-    for (String pair : header.split(";")) {
-      String cookie = pair.trim();
-      if (cookie.isEmpty()) {
-        continue;
-      }
-      int equals = cookie.indexOf('=');
-      String name = equals < 0 ? cookie : cookie.substring(0, equals);
-      String value = equals < 0 ? "" : cookie.substring(equals + 1);
-      values.putIfAbsent(name.trim(), decode(value));
-    }
-    return new Cookies(values);
+    return new Cookies(Pairs.split(header, ";", text -> decode(text.trim())));
   }
 
   /** The value of {@code name}, or an empty string when it is absent. */

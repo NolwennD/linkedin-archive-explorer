@@ -1,8 +1,8 @@
 package fr.craft.linkedinarchiveexplorer.web;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Stream;
 
 /**
  * Hands the URL to the system's own opener — {@code xdg-open}, {@code open} or
@@ -43,11 +43,9 @@ final class SystemBrowser implements BrowserLauncher {
     return List.of("xdg-open");
   }
 
-  /** The full command line for {@code url} on {@code osName}. */
-  static List<String> commandFor(String osName, String url) {
-    List<String> command = new ArrayList<>(openerFor(osName));
-    command.add(url);
-    return List.copyOf(command);
+  /** The full command line for {@code url} — what {@link #open} actually runs. */
+  List<String> commandLine(String url) {
+    return Stream.concat(opener.stream(), Stream.of(url)).toList();
   }
 
   /**
@@ -57,10 +55,8 @@ final class SystemBrowser implements BrowserLauncher {
    */
   @Override
   public void open(String url) {
-    List<String> command = new ArrayList<>(opener);
-    command.add(url);
     try {
-      new ProcessBuilder(command).start();
+      new ProcessBuilder(commandLine(url)).start();
     } catch (Exception unopened) {
       // Nothing to say that the printed URL does not already say.
     }

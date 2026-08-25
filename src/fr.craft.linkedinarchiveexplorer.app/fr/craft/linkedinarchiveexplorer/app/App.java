@@ -20,13 +20,8 @@ public final class App {
 
   private App() {}
 
-  enum Target {
-    CLI,
-    SERVE
-  }
-
   /** What to run, and with which arguments. */
-  record Route(Target target, List<String> arguments) {}
+  record Route(boolean serve, List<String> arguments) {}
 
   /**
    * Nothing at all, or {@code serve} first, opens the page; everything else goes to the
@@ -40,18 +35,18 @@ public final class App {
    */
   static Route route(String[] arguments) {
     if (arguments.length == 0) {
-      return new Route(Target.SERVE, List.of());
+      return new Route(true, List.of());
     }
     if (SERVE.equals(arguments[0])) {
-      return new Route(Target.SERVE, List.of(Arrays.copyOfRange(arguments, 1, arguments.length)));
+      return new Route(true, List.of(Arrays.copyOfRange(arguments, 1, arguments.length)));
     }
-    return new Route(Target.CLI, List.of(arguments));
+    return new Route(false, List.of(arguments));
   }
 
   public static void main(String[] args) {
     Route route = route(args);
     String[] arguments = route.arguments().toArray(String[]::new);
-    if (route.target() == Target.SERVE) {
+    if (route.serve()) {
       WebMain.main(arguments);
     } else {
       Main.main(arguments);

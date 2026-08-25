@@ -3,17 +3,14 @@ package fr.craft.linkedinarchiveexplorer.application;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toUnmodifiableList;
+
+import java.util.EnumMap;
 import java.util.List;
 
 /** The outcome of a search: non-empty groups, in canonical content-type order. */
 public record SearchResults(List<ContentGroup> groups) {
-
-  private static final Comparator<SearchHit> BY_DATE_DESCENDING =
-      Comparator.comparing((SearchHit hit) -> hit.date().orElse(null),
-          Comparator.nullsLast(Comparator.<LocalDate>reverseOrder()));
 
   public SearchResults(List<ContentGroup> groups) {
     if (groups == null) {
@@ -23,14 +20,11 @@ public record SearchResults(List<ContentGroup> groups) {
   }
 
   public static SearchResults from(List<SearchHit> hits) {
-    List<ContentGroup> groups = new ArrayList<>();
-    for (ContentType type : ContentType.values()) {
-      List<SearchHit> ofType =
-          hits.stream().filter(hit -> hit.type() == type).sorted(BY_DATE_DESCENDING).toList();
-      if (!ofType.isEmpty()) {
-        groups.add(new ContentGroup(type, ofType));
-      }
-    }
-    return new SearchResults(groups);
+    return new SearchResults(
+        hits.stream()
+            .collect(groupingBy(SearchHit::type, () -> new EnumMap<>(ContentType.class), toUnmodifiableList()))
+            .entrySet().stream()
+            .map(group -> new ContentGroup(group.getKey(), group.getValue()))
+            .toList());
   }
 }

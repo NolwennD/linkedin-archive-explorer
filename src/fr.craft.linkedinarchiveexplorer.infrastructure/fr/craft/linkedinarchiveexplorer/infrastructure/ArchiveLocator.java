@@ -42,8 +42,7 @@ public final class ArchiveLocator {
 
   /** The head of {@link #all}, when there is one. */
   public static Optional<Path> mostRecent(Path directory) {
-    List<Path> archives = all(directory);
-    return archives.isEmpty() ? Optional.empty() : Optional.of(archives.get(0));
+    return all(directory).stream().findFirst();
   }
 
   /**

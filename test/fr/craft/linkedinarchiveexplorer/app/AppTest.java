@@ -1,6 +1,7 @@
 package fr.craft.linkedinarchiveexplorer.app;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.util.List;
 import org.junit.jupiter.api.Nested;
@@ -21,21 +22,21 @@ class AppTest {
   @Nested
   class Routing {
 
-    @ParameterizedTest(name = "[{0}] → {1} [{2}]")
+    @ParameterizedTest(name = "[{0}] → serve={1} [{2}]")
     @CsvSource({
-      "'',                       SERVE, ''",
-      "'serve',                  SERVE, ''",
-      "'serve --port 9000',      SERVE, '--port 9000'",
-      "'serve --no-browser',     SERVE, '--no-browser'",
-      "'kotlin',                 CLI,   'kotlin'",
-      "'-i kotlin',              CLI,   '-i kotlin'",
-      "'--archive x.zip kotlin', CLI,   '--archive x.zip kotlin'",
+      "'',                       true,  ''",
+      "'serve',                  true,  ''",
+      "'serve --port 9000',      true,  '--port 9000'",
+      "'serve --no-browser',     true,  '--no-browser'",
+      "'kotlin',                 false, 'kotlin'",
+      "'-i kotlin',              false, '-i kotlin'",
+      "'--archive x.zip kotlin', false, '--archive x.zip kotlin'",
     })
     void sendsNothingAndServeToTheWebAndEverythingElseToTheTerminal(
-        String line, App.Target target, String passed) {
+        String line, boolean serve, String passed) {
       App.Route route = App.route(argumentsOf(line));
 
-      assertEquals(target, route.target());
+      assertEquals(serve, route.serve());
       assertEquals(expected(passed), route.arguments());
     }
 
@@ -45,13 +46,13 @@ class AppTest {
       // page. Reading the other arguments would mean duplicating both UIs' grammars here.
       App.Route route = App.route(new String[] {"--no-browser"});
 
-      assertEquals(App.Target.CLI, route.target());
+      assertFalse(route.serve());
       assertEquals(List.of("--no-browser"), route.arguments());
     }
 
     @Test
     void onlyTreatsServeAsASubCommandWhenItComesFirst() {
-      assertEquals(App.Target.CLI, App.route(new String[] {"kotlin", "serve"}).target());
+      assertFalse(App.route(new String[] {"kotlin", "serve"}).serve());
     }
   }
 }

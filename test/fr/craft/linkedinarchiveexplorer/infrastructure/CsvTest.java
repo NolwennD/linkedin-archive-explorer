@@ -102,7 +102,7 @@ class CsvTest {
   @Nested
   class TableView {
 
-    private final CsvTable table =
+    private final List<CsvRow> rows =
         Csv.parse(
             """
             Date,Message
@@ -111,20 +111,15 @@ class CsvTest {
 
     @Test
     void mapsCellsByHeaderName() {
-      CsvRow row = table.rows().get(0);
+      CsvRow row = rows.get(0);
 
       assertEquals("2024-01-01", row.get("Date"));
       assertEquals("hello, world", row.get("Message"));
     }
 
     @Test
-    void exposesTheHeader() {
-      assertEquals(List.of("Date", "Message"), table.headers());
-    }
-
-    @Test
     void rejectsAnUnknownColumn() {
-      assertThrows(IllegalArgumentException.class, () -> table.rows().get(0).get("Nope"));
+      assertThrows(IllegalArgumentException.class, () -> rows.get(0).get("Nope"));
     }
   }
 }

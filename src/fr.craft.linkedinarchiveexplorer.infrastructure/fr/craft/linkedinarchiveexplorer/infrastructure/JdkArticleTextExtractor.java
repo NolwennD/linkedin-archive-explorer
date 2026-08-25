@@ -14,7 +14,6 @@ import java.util.regex.Pattern;
  */
 public final class JdkArticleTextExtractor implements ArticleTextExtractor {
 
-  private static final Pattern TITLE = Pattern.compile("<title>(.*?)</title>", CASE_INSENSITIVE | DOTALL);
   private static final Pattern H1_HREF =
       Pattern.compile("<h1\\b[^>]*>.*?href=\"([^\"]*)\"", CASE_INSENSITIVE | DOTALL);
   private static final Pattern HEAD = Pattern.compile("<head\\b.*?</head>", CASE_INSENSITIVE | DOTALL);
@@ -29,12 +28,6 @@ public final class JdkArticleTextExtractor implements ArticleTextExtractor {
     String withoutCode = SCRIPT_OR_STYLE.matcher(withoutHead).replaceAll(" ");
     String withoutTags = TAG.matcher(withoutCode).replaceAll(" ");
     return WHITESPACE.matcher(unescape(withoutTags)).replaceAll(" ").trim();
-  }
-
-  @Override
-  public String title(String html) {
-    Matcher matcher = TITLE.matcher(html);
-    return matcher.find() ? unescape(matcher.group(1)).trim() : "";
   }
 
   @Override

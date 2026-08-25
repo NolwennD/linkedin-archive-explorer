@@ -27,7 +27,7 @@ class BrowserLauncherTest {
       // convention, and a wrong guess costs an unopened window, never a failure.
       assertEquals(
           List.of(expected.split(" ")),
-          SystemBrowser.commandFor(osName, "http://localhost:8080"));
+          new SystemBrowser(SystemBrowser.openerFor(osName)).commandLine("http://localhost:8080"));
     }
   }
 

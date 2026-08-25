@@ -2,7 +2,6 @@ package fr.craft.linkedinarchiveexplorer.web;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -20,20 +19,7 @@ public record QueryParameters(Map<String, String> values) {
 
   /** Parses a raw query string; {@code null} — no {@code ?} in the URI — yields no parameters. */
   public static QueryParameters parse(String rawQuery) {
-    Map<String, String> values = new LinkedHashMap<>();
-    if (rawQuery == null) {
-      return new QueryParameters(values);
-    }
-    for (String pair : rawQuery.split("&")) {
-      if (pair.isEmpty()) {
-        continue;
-      }
-      int equals = pair.indexOf('=');
-      String name = equals < 0 ? pair : pair.substring(0, equals);
-      String value = equals < 0 ? "" : pair.substring(equals + 1);
-      values.putIfAbsent(decode(name), decode(value));
-    }
-    return new QueryParameters(values);
+    return new QueryParameters(Pairs.split(rawQuery, "&", QueryParameters::decode));
   }
 
   /** The value of {@code name}, or an empty string when it is absent. */

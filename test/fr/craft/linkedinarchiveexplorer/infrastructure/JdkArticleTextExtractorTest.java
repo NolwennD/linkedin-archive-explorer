@@ -26,15 +26,6 @@ class JdkArticleTextExtractorTest {
       """;
 
   @Nested
-  class Title {
-
-    @Test
-    void readsTheTitleTag() {
-      assertEquals("My Article", extractor.title(ARTICLE));
-    }
-  }
-
-  @Nested
   class Url {
 
     @Test

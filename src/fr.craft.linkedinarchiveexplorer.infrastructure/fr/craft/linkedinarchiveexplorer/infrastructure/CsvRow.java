@@ -3,9 +3,9 @@ package fr.craft.linkedinarchiveexplorer.infrastructure;
 import java.util.List;
 
 /** One data row, addressable by header column name. */
-public record CsvRow(List<String> headers, List<String> values) {
+record CsvRow(List<String> headers, List<String> values) {
 
-  public CsvRow(List<String> headers, List<String> values) {
+  CsvRow(List<String> headers, List<String> values) {
     this.headers = List.copyOf(headers);
     this.values = List.copyOf(values);
   }

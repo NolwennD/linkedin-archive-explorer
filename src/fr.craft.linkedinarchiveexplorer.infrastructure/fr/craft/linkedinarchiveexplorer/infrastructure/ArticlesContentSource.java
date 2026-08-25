@@ -6,7 +6,6 @@ import fr.craft.linkedinarchiveexplorer.domain.ContentSource;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /** Reads the user's articles from the {@code Articles/**.html} files in the archive. */
 public final class ArticlesContentSource implements ContentSource {

@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
 import fr.craft.linkedinarchiveexplorer.domain.Content;

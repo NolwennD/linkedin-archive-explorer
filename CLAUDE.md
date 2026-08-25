@@ -143,7 +143,6 @@ src/<module-name>/            one directory per module (--module-source-path), e
   fr.craft.linkedinarchiveexplorer.domain/module-info.java + fr/craft/.../domain/*.java
 test/                         tests (compiled & run on the classpath; fixtures inline)
 test/data/corrupted.zip       the one versioned fixture (see Conventions)
-tools/                        AnonymizeArchive.java (one-off fixture generator)
 lib/                          JUnit standalone jar (test-scope)
 data/                         the LinkedIn .zip archives (gitignored)
 ```

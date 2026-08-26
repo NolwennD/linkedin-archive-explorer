@@ -84,22 +84,19 @@ public final class Package {
 
   /**
    * The runtime image. jlink follows the {@code requires} of the single root and works the
-   * closure out on its own — java.base plus jdk.httpserver, and nothing else.
+   * closure out on its own — java.base, jdk.httpserver and jdk.zipfs, nothing else.
    *
-   * <p>{@code jdk.zipfs} has to be named, though, and it is the one thing a module graph
-   * cannot tell you: {@code ZipArchive} opens the export through
-   * {@code FileSystems.newFileSystem}, whose provider is found by {@link
-   * java.util.ServiceLoader}, not by a {@code requires}. Without it the image compiles,
-   * links, starts — and fails on the first archive with {@code Provider not found}. Naming
-   * it costs 140 kB, measured; {@code --bind-services}, the blanket alternative, would drag
-   * in charsets, locales and crypto besides.
+   * <p>Nothing to name here: {@code jdk.zipfs} would escape the closure, being found by
+   * {@link java.util.ServiceLoader} rather than by a {@code requires}, so the
+   * {@code infrastructure} module requires it outright — see the comment there. Any future
+   * service provider will need the same, and only the smoke step will catch a missing one.
    */
   private static void image(Path output) {
     runTool(
         "jlink",
         List.of(
             "--module-path", "out",
-            "--add-modules", MODULE + ",jdk.zipfs",
+            "--add-modules", MODULE,
             "--launcher", NAME + "=" + MAIN,
             "--strip-debug",
             "--no-header-files",

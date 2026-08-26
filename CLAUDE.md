@@ -29,9 +29,11 @@ Read it before making structural changes.
   with the JDK: no third-party runtime dependency (no Jsoup, no CSV library, no web
   framework). The CSV and HTML parsing are hand-written. The only third-party jar is
   JUnit, and it is **test-scope only** (`lib/junit-platform-console-standalone-*.jar`).
-  `java.*` (Java SE) is the rule; the **single exception** is `com.sun.net.httpserver`
-  (module `jdk.httpserver`), used **only in the `web` module**. Rationale:
-  [the web UI design, § 2](docs/superpowers/specs/2026-07-31-web-ui-design.md).
+  `java.*` (Java SE) is the rule; the **only `jdk.*` type used** is
+  `com.sun.net.httpserver` (module `jdk.httpserver`), **in the `web` module alone**.
+  Rationale: [the web UI design, § 2](docs/superpowers/specs/2026-07-31-web-ui-design.md).
+  (`infrastructure` also `requires jdk.zipfs`, but reads no type from it — that module
+  exports none. It is a jlink directive; see the comment in its `module-info`.)
 - **Zero build tool.** No Maven, no Gradle. Compile and package with the JDK's own
   `javac` / `jar` / `java`. (Maven may be used *only* as a one-off downloader for the
   JUnit jar into `lib/`.)
@@ -66,9 +68,11 @@ zip cannot carry the executable bit) — see
 - **Package a release**: `./bin/package [version]` — builds, then produces the jlink runtime
   image and the lite bundle (jar + launchers), each with its `.sha256`, in `dist/`.
   Publishing is driven by pushing a `v*` tag; the procedure is [RELEASE.md](RELEASE.md).
-  `jdk.zipfs` must be named explicitly in the jlink roots: it is found by `ServiceLoader`,
-  so no module graph can deduce it, and without it the image starts and then fails on the
-  first archive with `Provider not found`.
+  The jlink roots need nothing but the `app` module: `jdk.zipfs`, found by `ServiceLoader`
+  and so invisible to the closure, is pulled in by an explicit `requires` in
+  `infrastructure/module-info.java`. Without it the image starts and then fails on the
+  first archive with `Provider not found` — and only the smoke step would catch it, which
+  holds for any service provider added later.
 - **Run the CLI**: `./linkedin-archive-explorer [--archive <path>] [--color|--no-color] [-i|--ignore-case] [-w|--word] <term>`
   — builds the jar on first use; equivalently `java -jar dist/linkedin-explorer.jar …`.
   (default archive: most recent `.zip` in `data/`).

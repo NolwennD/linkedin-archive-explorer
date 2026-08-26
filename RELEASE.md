@@ -12,9 +12,9 @@ The design behind all of this, and the reasoning for each choice, is in
 
 | File | For whom | Size |
 |---|---|---|
-| `linkedin-archive-explorer-<version>-linux-x64.tar.gz` | Linux, no JDK needed | ~22 MB |
-| `linkedin-archive-explorer-<version>-macos-aarch64.tar.gz` | Apple Silicon, no JDK needed | ~22 MB |
-| `linkedin-archive-explorer-<version>-windows-x64.zip` | Windows, no JDK needed | ~22 MB |
+| `linkedin-archive-explorer-<version>-linux-x64.tar.gz` | Linux, no JDK needed | ~8 MB |
+| `linkedin-archive-explorer-<version>-macos-aarch64.tar.gz` | Apple Silicon, no JDK needed | ~8 MB |
+| `linkedin-archive-explorer-<version>-windows-x64.zip` | Windows, no JDK needed | ~8 MB |
 | `linkedin-archive-explorer-<version>-lite.tar.gz` / `.zip` | anyone with **Java 17+** | ~60 KB |
 | `*.sha256` | one next to each archive | — |
 
@@ -42,9 +42,9 @@ cd /tmp && tar xzf ~/dev/projects/linkedin-archive-explorer/dist/linkedin-archiv
 ./linkedin-archive-explorer-1.2.3/bin/linkedin-archive-explorer serve --no-browser --port 8099
 ```
 
-This matters more than it looks: a runtime image can compile, link and start, and still be
-missing a service provider that only shows up when an archive is opened. See *When it
-fails*, below.
+This matters more than it looks: an ahead-of-time build can link and start, and still be
+missing something only reached at run time — a service provider, a reflective call. See
+*When it fails*, below.
 
 ## 2. Tag and push
 
@@ -67,10 +67,12 @@ and in the release page. Nothing in the source needs editing before tagging.
 
 ## 3. What the workflow does
 
-1. **Three runners in parallel** — `ubuntu-latest`, `macos-latest`, `windows-latest` — each
-   building the image for its own platform on **JDK 25**, which is the runtime that ends up
-   embedded. (The *source* floor stays Java 17, pinned by `--release` in `bin/build` and
-   checked by the CI workflow. The two are different things.)
+1. **Three runners in parallel** — `ubuntu-22.04`, `macos-latest`, `windows-latest` — each
+   compiling the binary for its own platform with **GraalVM 25** `native-image`. (The
+   *source* floor stays Java 17, pinned by `--release` in `bin/build` and checked by the CI
+   workflow. The two are different things.) Linux is pinned rather than `latest` because a
+   native executable links against the build machine's glibc, and that becomes the floor
+   every user has to clear; the workflow prints it.
 2. Each runner runs the full test suite, then `bin/package`.
 3. Each runner **smoke-tests the packaged binary**: it opens a deliberately damaged archive
    and expects a readable diagnosis, then starts the server and expects it to announce its
@@ -79,19 +81,26 @@ and in the release page. Nothing in the source needs editing before tagging.
    --generate-notes`. The lite bundle is built on all three but only the Linux copy is
    published, since it is platform-independent.
 
-No third-party action is used anywhere, and no secret beyond the token GitHub provides.
+One third-party action is used, `graalvm/setup-graalvm`, and no secret beyond the token
+GitHub provides.
 
 ## When it fails
 
-**The smoke test fails with `Provider not found`.** The runtime image is missing a service
-provider. `jlink` computes its module closure from `requires`, and a provider found through
-`ServiceLoader` is invisible to it — that is how `jdk.zipfs`, which `ZipArchive` needs to
-open a `.zip`, was once left out. Name the module explicitly in the `--add-modules` list of
-`bin/package`. The blanket alternative, `--bind-services`, drags in charsets, locales and
-crypto besides.
+**The smoke test fails on the first archive.** Something reached only at run time was left
+out of the closed world native-image computes. GraalVM resolves `ServiceLoader` providers at
+build time from the JDK's own `provides` clauses, so `jdk.zipfs` comes along by itself — but
+reflection does not. Declare what is missing in a reflection configuration.
 
-This failure mode is why the smoke step exists: nothing on the development classpath
-reproduces it, because a full JDK provides everything.
+**The binary dies with `Illegal instruction`.** The CPU is older than the baseline it was
+compiled for. `bin/package` pins `-march=compatibility` to avoid exactly this; check that it
+has not been changed.
+
+**`GLIBC_2.xx not found`.** The user's distribution is older than the runner that built the
+binary. The floor is printed by the workflow; lowering it means building in an older
+container, or a static build against musl.
+
+These failure modes are why the smoke step exists: nothing on the development classpath
+reproduces them, because a full JVM provides everything and decides at run time.
 
 **The smoke test fails to find the launcher.** `jlink --launcher` produces a shell script on
 Unix and a `.bat` on Windows; the step tries both. If the Windows layout ever changes, that

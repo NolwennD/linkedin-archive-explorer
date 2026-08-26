@@ -18,9 +18,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # jlink only builds an image for the platform it runs on, so one runner per
-          # target — which also spares us downloading foreign JDKs for their jmods.
-          - os: ubuntu-latest
+          # native-image cross-compiles no more than jlink did, so one runner per target.
+          #
+          # Pinned to 22.04, not ubuntu-latest: a native executable links against the build
+          # machine's glibc, which becomes the floor every user has to clear. The label is
+          # the floor, so it is chosen rather than inherited — and it stops moving the day
+          # GitHub points ubuntu-latest at a newer release. No runner older than 22.04 is
+          # offered; going lower would mean building in a container.
+          - os: ubuntu-22.04
             label: linux-x64
           - os: macos-latest
             label: macos-aarch64
@@ -29,13 +34,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 25 is what ends up embedded in the image. The source floor stays 17, pinned by
-      # --release in bin/build and checked by the CI workflow — the two are not the same
-      # thing and do not move together.
-      - uses: actions/setup-java@v5
+      # GraalVM, because bin/package compiles the full bundle ahead of time with
+      # native-image. The source floor stays 17, pinned by --release in bin/build and
+      # checked by the CI workflow — the two are not the same thing and do not move
+      # together. On Windows this step is also what puts the MSVC toolchain that
+      # native-image needs on the path.
+      - uses: graalvm/setup-graalvm@v1
         with:
-          distribution: temurin
+          distribution: graalvm
           java-version: '25'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests
         run: java --source 17 bin/test
@@ -44,8 +52,9 @@ jobs:
         run: java --source 17 bin/package ${GITHUB_REF_NAME#v}
         shell: bash
 
-      # The only check that proves the jlink closure is complete: a missing service
-      # provider — jdk.zipfs, say — links and starts fine, then fails on the first archive.
+      # The only check that proves the ahead-of-time build kept what it needs: a service
+      # provider or a reflective call left out is invisible until it runs. The binary
+      # starts fine, then fails on the first archive.
       - name: Smoke-test the packaged binary
         shell: bash
         run: |
@@ -61,6 +70,15 @@ jobs:
           "$launcher" serve --no-browser --port 8099 > serve.txt 2>&1 &
           sleep 8
           grep -q "Serving on http://localhost:8099" serve.txt
+
+      # The compatibility floor imposed on users, printed rather than assumed. It is the
+      # highest symbol the binary references, not the runner's glibc — lower, in practice.
+      # If this number climbs, older distributions have quietly been dropped.
+      - name: Report the glibc floor
+        if: runner.os == 'Linux'
+        run: |
+          objdump -T "dist/linkedin-archive-explorer-${GITHUB_REF_NAME#v}/bin/linkedin-archive-explorer" \
+            | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1
 
       - uses: actions/upload-artifact@v4
         with:

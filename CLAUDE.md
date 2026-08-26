@@ -15,7 +15,7 @@ characters of context around each occurrence. Two grep-style options relax the m
 It has **two interchangeable UIs over the same core**: the terminal, and a local web page
 served by the JDK's own HTTP server — which is what you get when no argument is given. See
 [docs/superpowers/specs/2026-07-31-web-ui-design.md](docs/superpowers/specs/2026-07-31-web-ui-design.md).
-It ships as **two bundles**: a `jlink` runtime image for whoever has no JDK, and a lite one
+It ships as **two bundles**: a GraalVM native executable for whoever has no JDK, and a lite one
 (jar + launchers) for whoever has one. See
 [docs/superpowers/specs/2026-08-01-executable-binary-design.md](docs/superpowers/specs/2026-08-01-executable-binary-design.md).
 
@@ -33,10 +33,12 @@ Read it before making structural changes.
   `com.sun.net.httpserver` (module `jdk.httpserver`), **in the `web` module alone**.
   Rationale: [the web UI design, § 2](docs/superpowers/specs/2026-07-31-web-ui-design.md).
   (`infrastructure` also `requires jdk.zipfs`, but reads no type from it — that module
-  exports none. It is a jlink directive; see the comment in its `module-info`.)
+  exports none. It is a jlink relic, inert since the release binary went native; see the
+  comment in its `module-info`.)
 - **Zero build tool.** No Maven, no Gradle. Compile and package with the JDK's own
-  `javac` / `jar` / `java`. (Maven may be used *only* as a one-off downloader for the
-  JUnit jar into `lib/`.)
+  `javac` / `jar` / `java`, plus `native-image` for the release binary — all commands, no
+  build system. (Maven may be used *only* as a one-off downloader for the JUnit jar into
+  `lib/`.) Building the **full bundle needs a GraalVM**; running it needs nothing.
 - **Java 17 or newer** — the code is verified to compile and test-pass on JDK 17.
   (`mise.toml` pins 26 for the dev environment.) Do **not** reach for `HttpHandlers` or
   `SimpleFileServer` (Java 18+): raising the floor was weighed and rejected, they buy
@@ -65,14 +67,14 @@ zip cannot carry the executable bit) — see
 - **Build**: `./bin/build` — modular compile (enforcement) then packages every
   layer into `dist/linkedin-explorer.jar`. Both compilations pin `--release 17`, so the jar
   runs on the documented floor whatever JDK built it. (Windows: `bin\build.cmd`.)
-- **Package a release**: `./bin/package [version]` — builds, then produces the jlink runtime
-  image and the lite bundle (jar + launchers), each with its `.sha256`, in `dist/`.
-  Publishing is driven by pushing a `v*` tag; the procedure is [RELEASE.md](RELEASE.md).
-  The jlink roots need nothing but the `app` module: `jdk.zipfs`, found by `ServiceLoader`
-  and so invisible to the closure, is pulled in by an explicit `requires` in
-  `infrastructure/module-info.java`. Without it the image starts and then fails on the
-  first archive with `Provider not found` — and only the smoke step would catch it, which
-  holds for any service provider added later.
+- **Package a release**: `./bin/package [version]` — builds, then produces the native
+  executable (GraalVM `native-image`, from the jar) and the lite bundle (jar + launchers),
+  each with its `.sha256`, in `dist/`. Publishing is driven by pushing a `v*` tag; the
+  procedure is [RELEASE.md](RELEASE.md). Two flags carry a distribution decision:
+  `--no-fallback`, so a build that could not resolve everything fails instead of quietly
+  needing a JVM, and `-march=compatibility`, without which an older CPU dies on an illegal
+  instruction with no message at all. Nothing needs naming for `jdk.zipfs`: GraalVM resolves
+  `ServiceLoader` providers at build time from the JDK's own `provides` clauses.
 - **Run the CLI**: `./linkedin-archive-explorer [--archive <path>] [--color|--no-color] [-i|--ignore-case] [-w|--word] <term>`
   — builds the jar on first use; equivalently `java -jar dist/linkedin-explorer.jar …`.
   (default archive: most recent `.zip` in `data/`).
@@ -121,7 +123,7 @@ fr.craft.linkedinarchiveexplorer.app              requires cli, web        (App 
   branched in one place, for both UIs at once.
 - **`cli` and `web` are siblings — no edge between them.** Two UI adapters over the same
   core. The choice between them belongs to **`app`**, which requires both and is the jar's
-  `Main-Class` and the image's single jlink root; `cli` and `web` export their entry point
+  `Main-Class` and the native binary's entry point; `cli` and `web` export their entry point
   *to `app` only* (qualified export). Never make one UI module require the other — a third
   UI joins at `app`. See
   [the binary design](docs/superpowers/specs/2026-08-01-executable-binary-design.md).

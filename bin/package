@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.nio.file.attribute.PosixFilePermission;
-import java.util.spi.ToolProvider;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -26,10 +25,11 @@ import java.util.zip.ZipOutputStream;
  *
  * <p>Produces two bundles, for two audiences:
  * <ul>
- *   <li>the <strong>full</strong> one, a {@code jlink} runtime image, for whoever has no JDK;
- *   <li>the <strong>lite</strong> one, the jar plus the same launchers, for whoever has one.
+ *   <li>the <strong>full</strong> one, a GraalVM native executable, for whoever has no JDK;
+ *   <li>the <strong>lite</strong> one, the jar plus a launcher, for whoever has one.
  * </ul>
- * Each comes with its {@code .sha256}.
+ * Each comes with its {@code .sha256}. The full bundle therefore needs a <strong>GraalVM</strong>
+ * to build — it needs nothing at all to run, which is the whole point.
  *
  * <p>Unlike {@code bin/build} and {@code bin/test}, which must run anywhere without
  * anything installed, this one publishes: it shells out to the system {@code tar} on Unix,
@@ -42,8 +42,14 @@ public final class Package {
 
   private static final String NAME = "linkedin-archive-explorer";
   private static final String JAR = "dist/linkedin-explorer.jar";
-  private static final String MODULE = "fr.craft.linkedinarchiveexplorer.app";
-  private static final String MAIN = MODULE + "/" + MODULE + ".App";
+
+  /**
+   * native-image defaults to {@code -march=x86-64-v3} — Haswell, 2013 — and an older CPU
+   * dies on the first illegal instruction, with no message and nothing to diagnose it by.
+   * A published binary is worth the compatible baseline; drop this constant to
+   * {@code -march=x86-64-v3} if the target CPUs are known.
+   */
+  private static final String MARCH = "-march=compatibility";
 
   public static void main(String[] args) throws IOException, InterruptedException {
     String version = args.length > 0 ? args[0] : "dev";
@@ -56,7 +62,7 @@ public final class Package {
     deleteRecursively(full);
     deleteRecursively(lite);
 
-    image(full);
+    nativeImage(full);
     liteBundle(lite);
 
     List<Path> archives = new ArrayList<>();
@@ -73,7 +79,11 @@ public final class Package {
     }
   }
 
-  /** The modular compile jlink needs, and the jar the lite bundle ships, in one go. */
+  /**
+   * The jar both bundles are built from — and, on the way, the modular compile that
+   * enforces the architecture. Nothing is shipped from {@code out/} any more: it is a
+   * conformance check now, not a packaging input.
+   */
   private static void build() throws IOException, InterruptedException {
     int status =
         new ProcessBuilder("java", "--source", "17", "bin/build").inheritIO().start().waitFor();
@@ -83,26 +93,44 @@ public final class Package {
   }
 
   /**
-   * The runtime image. jlink follows the {@code requires} of the single root and works the
-   * closure out on its own — java.base, jdk.httpserver and jdk.zipfs, nothing else.
+   * The native executable, built from the jar — its {@code Main-Class} is the entry point,
+   * so no module is named here.
    *
-   * <p>Nothing to name here: {@code jdk.zipfs} would escape the closure, being found by
-   * {@link java.util.ServiceLoader} rather than by a {@code requires}, so the
-   * {@code infrastructure} module requires it outright — see the comment there. Any future
-   * service provider will need the same, and only the smoke step will catch a missing one.
+   * <p>{@code jdk.zipfs} needs no help, unlike under jlink: GraalVM resolves the
+   * {@link java.util.ServiceLoader} providers <em>at build time</em>, from the
+   * {@code provides} clauses of the JDK's own modules. {@code --no-fallback} makes that a
+   * guarantee — rather than quietly emitting an image that needs a JVM, the build fails.
+   *
+   * <p>native-image is not a {@link java.util.spi.ToolProvider}: it is a separate executable
+   * of the GraalVM distribution, hence the process and the plain message when it is missing.
    */
-  private static void image(Path output) {
-    runTool(
-        "jlink",
-        List.of(
-            "--module-path", "out",
-            "--add-modules", MODULE,
-            "--launcher", NAME + "=" + MAIN,
-            "--strip-debug",
-            "--no-header-files",
-            "--no-man-pages",
-            "--compress=zip-6",
-            "--output", output.toString()));
+  private static void nativeImage(Path output) throws IOException, InterruptedException {
+    Path tool = nativeImageTool();
+    Files.createDirectories(output.resolve("bin"));
+    ProcessBuilder builder =
+        new ProcessBuilder(
+            tool.toString(),
+            "-jar", JAR,
+            "-o", output.resolve("bin").resolve(NAME).toString(),
+            "--no-fallback",
+            MARCH);
+    builder.inheritIO();
+    int status = builder.start().waitFor();
+    if (status != 0) {
+      System.err.println("native-image failed (exit " + status + ")");
+      System.exit(status);
+    }
+  }
+
+  private static Path nativeImageTool() {
+    Path home = Path.of(System.getProperty("java.home"));
+    Path tool = home.resolve("bin").resolve(isWindows() ? "native-image.cmd" : "native-image");
+    if (!Files.isExecutable(tool)) {
+      System.err.println("native-image was not found at " + tool);
+      System.err.println("The full bundle needs a GraalVM; this is " + home + ".");
+      System.exit(1);
+    }
+    return tool;
   }
 
   /** The jar, plus the very same command, so both bundles are documented once. */
@@ -222,17 +250,6 @@ public final class Package {
     permissions.add(PosixFilePermission.GROUP_EXECUTE);
     permissions.add(PosixFilePermission.OTHERS_EXECUTE);
     Files.setPosixFilePermissions(file, permissions);
-  }
-
-  /** Runs a JDK tool in-process; exits with its status if it fails. */
-  private static void runTool(String name, List<String> arguments) {
-    ToolProvider tool =
-        ToolProvider.findFirst(name).orElseThrow(() -> new IllegalStateException("JDK tool not found: " + name));
-    int status = tool.run(System.out, System.err, arguments.toArray(String[]::new));
-    if (status != 0) {
-      System.err.println(name + " failed (exit " + status + ")");
-      System.exit(status);
-    }
   }
 
   private static void deleteRecursively(Path root) throws IOException {

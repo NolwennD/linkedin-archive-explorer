@@ -3,9 +3,18 @@ package fr.craft.linkedinarchiveexplorer.cli;
 import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
+import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
+import static java.util.stream.Collectors.collectingAndThen;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.mapping;
+import static java.util.stream.Collectors.teeing;
+import static java.util.stream.Collectors.toCollection;
+
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
@@ -16,6 +25,7 @@ import java.util.List;
  */
 public final class TerminalRenderer {
 
+  private static final String NEWLINE = "\n";
   private static final String ESC = "\u001B";
   private static final String RESET = ESC + "[0m";
   private static final String BOLD = ESC + "[1m";
@@ -30,40 +40,50 @@ public final class TerminalRenderer {
 
   public String render(SearchTerm term, SearchResults results) {
     if (results.groups().isEmpty()) {
-      return "No results for \"" + term.value() + "\".\n";
+      return "No results for \"" + term.value() + "\"." + NEWLINE;
     }
-    StringBuilder output = new StringBuilder();
-    for (ContentGroup group : results.groups()) {
-      String heading = heading(group.type());
-      output.append(bold(heading)).append('\n');
-      output.append("─".repeat(heading.length())).append('\n');
-      if (group.type() == ContentType.MESSAGE) {
-        group.byCorrespondent().forEach((who, hits) -> {
-          output.append(bold(who.name()));
-          threads(hits).forEach(url -> output.append("  ").append(link(url)));
-          output.append('\n');
-          hits.forEach(hit -> appendHit(output, formateDate(hit).stripTrailing(), hit));
-        });
-      } else {
-        group.hits().forEach(hit -> appendHit(output, hitHeader(hit), hit));
-      }
-      output.append('\n');
-    }
-    return output.toString();
+    return results.groups().stream().map(this::group).collect(joining(NEWLINE)) + NEWLINE;
   }
 
-  /** The conversation links, each once: a person may have several threads. */
-  private static List<String> threads(List<SearchHit> hits) {
-    return hits.stream().map(SearchHit::url).distinct().toList();
+  private String group(ContentGroup group) {
+    String heading = heading(group.type());
+    return bold(heading) + NEWLINE + "─".repeat(heading.length()) + NEWLINE + body(group);
   }
 
-  private void appendHit(StringBuilder output, String header, SearchHit hit) {
-    if (!header.isEmpty()) {
-      output.append(header).append('\n');
-    }
-    for (Excerpt excerpt : hit.excerpts()) {
-      output.append("   • ").append(highlighted(excerpt)).append('\n');
-    }
+  private String body(ContentGroup group) {
+    return switch (group.type()) {
+      case MESSAGE ->
+          group.byCorrespondent().entrySet().stream()
+              .map(entry -> correspondent(entry.getKey(), entry.getValue()))
+              .collect(joining());
+      case ARTICLE, POST, COMMENT ->
+          group.hits().stream().map(hit -> hit(hitHeader(hit), hit)).collect(joining());
+    };
+  }
+
+  /** The conversation links, each once, beside the name: a person may have several threads. */
+  private String correspondent(Correspondent who, List<SearchHit> hits) {
+    record Rendered(String threads, String messages) {}
+    Rendered rendered =
+        hits.stream()
+            .collect(
+                teeing(
+                    mapping(
+                        SearchHit::url,
+                        collectingAndThen(toCollection(LinkedHashSet::new), this::links)),
+                    mapping(hit -> hit(formatDate(hit).stripTrailing(), hit), joining()),
+                    Rendered::new));
+    return bold(who.name()) + rendered.threads() + NEWLINE + rendered.messages();
+  }
+
+  private String links(Collection<String> urls) {
+    return urls.stream().map(url -> "  " + link(url)).collect(joining());
+  }
+
+  private String hit(String header, SearchHit hit) {
+    String excerpts =
+        hit.excerpts().stream().map(excerpt -> "   • " + highlighted(excerpt) + NEWLINE).collect(joining());
+    return (header.isEmpty() ? "" : header + NEWLINE) + excerpts;
   }
 
   private static String heading(ContentType type) {
@@ -76,10 +96,10 @@ public final class TerminalRenderer {
   }
 
   private String hitHeader(SearchHit hit) {
-    return formateDate(hit) + link(hit.url());
+    return formatDate(hit) + link(hit.url());
   }
 
-  private static String formateDate(SearchHit hit) {
+  private static String formatDate(SearchHit hit) {
     return hit.date().map(day -> "[" + day + "] ").orElse("");
   }
 

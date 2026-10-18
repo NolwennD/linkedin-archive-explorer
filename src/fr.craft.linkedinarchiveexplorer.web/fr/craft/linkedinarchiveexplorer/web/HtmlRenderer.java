@@ -9,6 +9,15 @@ import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
 import fr.craft.linkedinarchiveexplorer.domain.WordScope;
+import static fr.craft.linkedinarchiveexplorer.web.HtmlEscaper.escape;
+import static java.util.stream.Collectors.collectingAndThen;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.mapping;
+import static java.util.stream.Collectors.teeing;
+import static java.util.stream.Collectors.toCollection;
+
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -17,7 +26,7 @@ import java.util.Locale;
  * collapsible section per content type. The web twin of {@code TerminalRenderer}.
  *
  * <p>Every value taken from the archive — or typed by the user — goes through
- * {@link #escape}, because an authored post may legitimately contain markup.
+ * {@link HtmlEscaper#escape}, because an authored post may legitimately contain markup.
  */
 public final class HtmlRenderer {
 
@@ -150,25 +159,31 @@ public final class HtmlRenderer {
   }
 
   private String groups(SearchResults results) {
-    StringBuilder html = new StringBuilder();
-    for (ContentGroup group : results.groups()) {
-      String id = group.type().name().toLowerCase(Locale.ROOT) + "s";
-      html.append(
-          """
-          <section aria-labelledby="%s">
-          <details open>
-          <summary><h2 id="%s">%s <span class="count">(%d)</span></h2></summary>
-          <ol>
-          """
-              .formatted(id, id, heading(group.type()), group.hits().size()));
-      if (group.type() == ContentType.MESSAGE) {
-        group.byCorrespondent().forEach((who, hits) -> html.append(correspondent(who, hits)));
-      } else {
-        group.hits().forEach(hit -> html.append(hit(hit)));
-      }
-      html.append("</ol>\n</details>\n</section>\n");
-    }
-    return html.toString();
+    return results.groups().stream().map(this::group).collect(joining());
+  }
+
+  private String group(ContentGroup group) {
+    String id = group.type().name().toLowerCase(Locale.ROOT) + "s";
+    return """
+        <section aria-labelledby="%s">
+        <details open>
+        <summary><h2 id="%s">%s <span class="count">(%d)</span></h2></summary>
+        <ol>
+        %s</ol>
+        </details>
+        </section>
+        """
+        .formatted(id, id, heading(group.type()), group.hits().size(), items(group));
+  }
+
+  private String items(ContentGroup group) {
+    return switch (group.type()) {
+      case MESSAGE ->
+          group.byCorrespondent().entrySet().stream()
+              .map(entry -> correspondent(entry.getKey(), entry.getValue()))
+              .collect(joining());
+      case ARTICLE, POST, COMMENT -> group.hits().stream().map(this::hit).collect(joining());
+    };
   }
 
   /** Title case in the markup; the stylesheet is what shouts it in capitals. */
@@ -183,13 +198,16 @@ public final class HtmlRenderer {
 
   /** A person, their conversation link(s) once, and below them their matching messages. */
   private String correspondent(Correspondent who, List<SearchHit> hits) {
-    StringBuilder messages = new StringBuilder();
-    hits.forEach(hit -> messages.append(message(hit)));
-    StringBuilder threads = new StringBuilder();
-    hits.stream()
-        .map(SearchHit::url)
-        .distinct()
-        .forEach(url -> threads.append(" <a href=\"%s\">%s</a>".formatted(escape(url), escape(url))));
+    record Rendered(String threads, String messages) {}
+    Rendered rendered =
+        hits.stream()
+            .collect(
+                teeing(
+                    mapping(
+                        SearchHit::url,
+                        collectingAndThen(toCollection(LinkedHashSet::new), this::links)),
+                    mapping(this::message, joining()),
+                    Rendered::new));
     return """
         <li>
         <h3><strong>%s</strong>%s</h3>
@@ -197,7 +215,13 @@ public final class HtmlRenderer {
         %s</ol>
         </li>
         """
-        .formatted(escape(who.name()), threads, messages);
+        .formatted(escape(who.name()), rendered.threads(), rendered.messages());
+  }
+
+  private String links(Collection<String> urls) {
+    return urls.stream()
+        .map(url -> " <a href=\"%s\">%s</a>".formatted(escape(url), escape(url)))
+        .collect(joining());
   }
 
   /** A message under its person: the conversation link is on the person, not repeated here. */
@@ -227,11 +251,9 @@ public final class HtmlRenderer {
   }
 
   private static String excerptItems(SearchHit hit) {
-    StringBuilder excerpts = new StringBuilder();
-    for (Excerpt excerpt : hit.excerpts()) {
-      excerpts.append("<li>").append(highlighted(excerpt)).append("</li>\n");
-    }
-    return excerpts.toString();
+    return hit.excerpts().stream()
+        .map(excerpt -> "<li>" + highlighted(excerpt) + "</li>\n")
+        .collect(joining());
   }
 
   private static String date(SearchHit hit) {
@@ -262,14 +284,5 @@ public final class HtmlRenderer {
         <p>No results for "%s".</p>
         """
         .formatted(escape(term.value()));
-  }
-
-  /** The ampersand goes first, or it would escape the escapes that follow. */
-  static String escape(String text) {
-    return text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-        .replace("'", "&#39;");
   }
 }

@@ -46,7 +46,7 @@ Read it before making structural changes.
   `SimpleFileServer` (Java 18+): raising the floor was weighed and rejected, they buy
   three or four lines. See the web UI design, § 2.
 - **Nothing from the archive reaches a page unescaped.** In the `web` module every value
-  taken from the archive — and the search term — goes through `HtmlRenderer.escape`. An
+  taken from the archive — and the search term — goes through `HtmlEscaper.escape`. An
   authored post may legitimately contain `<script>`; without this it would run in the
   user's own page. No JavaScript and no static files are served, by design.
 

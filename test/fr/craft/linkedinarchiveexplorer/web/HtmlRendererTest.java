@@ -441,15 +441,6 @@ class HtmlRendererTest {
   }
 
   @Nested
-  class Escape {
-
-    @Test
-    void replacesEveryCharacterThatCouldBreakOutOfMarkup() {
-      assertEquals("&amp;&lt;&gt;&quot;&#39;", HtmlRenderer.escape("&<>\"'"));
-    }
-  }
-
-  @Nested
   class Messages {
 
     private SearchHit message(String who, Optional<String> profile, String thread) {

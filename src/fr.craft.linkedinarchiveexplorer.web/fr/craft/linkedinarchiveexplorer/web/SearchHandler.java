@@ -128,7 +128,7 @@ final class SearchHandler implements HttpHandler {
         <body><h1>Error</h1><p>%s</p></body>
         </html>
         """
-        .formatted(HtmlRenderer.escape(String.valueOf(failure.getMessage())));
+        .formatted(HtmlEscaper.escape(String.valueOf(failure.getMessage())));
   }
 
   private static void respond(HttpExchange exchange, int status, String contentType, String body)

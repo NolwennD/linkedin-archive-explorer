@@ -26,6 +26,10 @@ public record SearchHit(Content content, List<Excerpt> excerpts) {
     return content.url();
   }
 
+  public Optional<Correspondent> correspondent() {
+    return content.correspondent();
+  }
+
   public Optional<LocalDate> date() {
     return content.date();
   }

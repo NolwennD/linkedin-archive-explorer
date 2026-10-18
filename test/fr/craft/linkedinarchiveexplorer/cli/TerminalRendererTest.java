@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
+import fr.craft.linkedinarchiveexplorer.domain.Body;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
+import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
 import fr.craft.linkedinarchiveexplorer.domain.Match;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
@@ -107,6 +109,37 @@ class TerminalRendererTest {
 
       assertTrue(output.contains("ARTICLES"), output);
       assertFalse(output.contains("["), "articles have no date bracket: " + output);
+    }
+  }
+
+  @Nested
+  class Messages {
+
+    private SearchHit message(String who, String url, String thread) {
+      Content content =
+          new Content(
+              ContentType.MESSAGE,
+              Optional.of(LocalDate.of(2026, 7, 20)),
+              thread,
+              new Body("text"),
+              Optional.of(new Correspondent(who, Optional.of(url))));
+      return new SearchHit(content, List.of(excerpt("a ", "foo", " b")));
+    }
+
+    @Test
+    void listsEachCorrespondentAlphabeticallyWithTheThreadLinkOnceBesideTheName() {
+      SearchResults results =
+          SearchResults.from(
+              List.of(message("Rose", "https://li/in/rose", "https://li/t/1/"), message("Alice", "https://li/in/alice", "https://li/t/2/"),
+                  message("Rose", "https://li/in/rose", "https://li/t/1/")));
+
+      String output = new TerminalRenderer(false).render(SearchTerm.literal("foo"), results);
+
+      assertTrue(output.contains("MESSAGES\n────────\n"), output);
+      assertTrue(
+          output.indexOf("Alice  https://li/t/2/\n[2026-07-20]\n   • a foo b\n")
+              < output.indexOf("Rose  https://li/t/1/\n[2026-07-20]\n   • a foo b\n[2026-07-20]\n"),
+          output);
     }
   }
 }

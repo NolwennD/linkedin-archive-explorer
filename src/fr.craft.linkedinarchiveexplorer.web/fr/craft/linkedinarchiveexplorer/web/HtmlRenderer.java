@@ -4,10 +4,12 @@ import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
+import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
 import fr.craft.linkedinarchiveexplorer.domain.WordScope;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -27,7 +29,7 @@ public final class HtmlRenderer {
       body { font-family: system-ui, sans-serif; line-height: 1.5; margin: 0 auto; max-width: 46rem; padding: 1rem 1.5rem; }
       h1 { font-size: 1.1rem; }
       h2 { display: inline; font-size: .95rem; letter-spacing: .08em; text-transform: uppercase; }
-      h3 { font-size: .8rem; font-weight: normal; margin: 1.1rem 0 .1rem; overflow-wrap: anywhere; }
+      h3 { font-size: 1rem; font-weight: normal; margin: 1.1rem 0 .1rem; overflow-wrap: anywhere; }
       form { align-items: center; display: grid; gap: .45rem .75rem; grid-template-columns: max-content minmax(0, 1fr) max-content; }
       input[type=search], select { padding: .3rem; width: 100%; }
       .options { display: flex; flex-wrap: wrap; gap: .3rem 1rem; grid-column: 2 / -1; }
@@ -159,8 +161,10 @@ public final class HtmlRenderer {
           <ol>
           """
               .formatted(id, id, heading(group.type()), group.hits().size()));
-      for (SearchHit hit : group.hits()) {
-        html.append(hit(hit));
+      if (group.type() == ContentType.MESSAGE) {
+        group.byCorrespondent().forEach((who, hits) -> html.append(correspondent(who, hits)));
+      } else {
+        group.hits().forEach(hit -> html.append(hit(hit)));
       }
       html.append("</ol>\n</details>\n</section>\n");
     }
@@ -173,14 +177,43 @@ public final class HtmlRenderer {
       case ARTICLE -> "Articles";
       case POST -> "Posts";
       case COMMENT -> "Comments";
+      case MESSAGE -> "Messages";
     };
   }
 
+  /** A person, their conversation link(s) once, and below them their matching messages. */
+  private String correspondent(Correspondent who, List<SearchHit> hits) {
+    StringBuilder messages = new StringBuilder();
+    hits.forEach(hit -> messages.append(message(hit)));
+    StringBuilder threads = new StringBuilder();
+    hits.stream()
+        .map(SearchHit::url)
+        .distinct()
+        .forEach(url -> threads.append(" <a href=\"%s\">%s</a>".formatted(escape(url), escape(url))));
+    return """
+        <li>
+        <h3><strong>%s</strong>%s</h3>
+        <ol>
+        %s</ol>
+        </li>
+        """
+        .formatted(escape(who.name()), threads, messages);
+  }
+
+  /** A message under its person: the conversation link is on the person, not repeated here. */
+  private String message(SearchHit hit) {
+    return """
+        <li>
+        <article>
+        %s<ul>
+        %s</ul>
+        </article>
+        </li>
+        """
+        .formatted(date(hit), excerptItems(hit));
+  }
+
   private String hit(SearchHit hit) {
-    StringBuilder excerpts = new StringBuilder();
-    for (Excerpt excerpt : hit.excerpts()) {
-      excerpts.append("<li>").append(highlighted(excerpt)).append("</li>\n");
-    }
     return """
         <li>
         <article>
@@ -190,7 +223,15 @@ public final class HtmlRenderer {
         </article>
         </li>
         """
-        .formatted(escape(hit.url()), escape(hit.url()), date(hit), excerpts);
+            .formatted(escape(hit.url()), escape(hit.url()), date(hit), excerptItems(hit));
+  }
+
+  private static String excerptItems(SearchHit hit) {
+    StringBuilder excerpts = new StringBuilder();
+    for (Excerpt excerpt : hit.excerpts()) {
+      excerpts.append("<li>").append(highlighted(excerpt)).append("</li>\n");
+    }
+    return excerpts.toString();
   }
 
   private static String date(SearchHit hit) {

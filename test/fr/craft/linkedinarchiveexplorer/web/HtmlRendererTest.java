@@ -6,8 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
+import fr.craft.linkedinarchiveexplorer.domain.Body;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
+import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
 import fr.craft.linkedinarchiveexplorer.domain.Match;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
@@ -444,6 +446,45 @@ class HtmlRendererTest {
     @Test
     void replacesEveryCharacterThatCouldBreakOutOfMarkup() {
       assertEquals("&amp;&lt;&gt;&quot;&#39;", HtmlRenderer.escape("&<>\"'"));
+    }
+  }
+
+  @Nested
+  class Messages {
+
+    private SearchHit message(String who, Optional<String> profile, String thread) {
+      Content content =
+          new Content(
+              ContentType.MESSAGE,
+              Optional.of(A_DAY),
+              thread,
+              new Body("text"),
+              Optional.of(new Correspondent(who, profile)));
+      return new SearchHit(content, List.of(excerpt("a ", "foo", " b")));
+    }
+
+    @Test
+    void listsCorrespondentsAlphabeticallyWithTheThreadLinkOnceBesideTheName() {
+      String html =
+          render(
+              SearchTerm.literal("foo"),
+              results(
+                  message("Rose", Optional.of("https://li/in/rose"), "https://li/t/1/"),
+                  message("Alice", Optional.empty(), "https://li/t/2/"),
+                  message("Rose", Optional.of("https://li/in/rose"), "https://li/t/1/")));
+
+      assertTrue(html.contains("Messages <span class=\"count\">(3)</span>"), html);
+      assertTrue(html.indexOf("<h3><strong>Alice</strong> <a href=\"https://li/t/2/\">") < html.indexOf("<h3><strong>Rose</strong> <a href=\"https://li/t/1/\">"), html);
+      assertEquals(1, html.split("href=\"https://li/t/1/\"", -1).length - 1, html);
+    }
+
+    @Test
+    void escapesTheCorrespondentName() {
+      String html =
+          render(SearchTerm.literal("foo"), results(message("<script>x</script>", Optional.empty(), "https://li/t/1/")));
+
+      assertFalse(html.contains("<script>x"), html);
+      assertTrue(html.contains("&lt;script&gt;x&lt;/script&gt;"), html);
     }
   }
 }

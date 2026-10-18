@@ -5,9 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A tool to **explore a LinkedIn data export**. It runs a literal, grep-style search (case-
-and accent-sensitive by default) over the user's **comments, posts and articles** and
+and accent-sensitive by default) over the user's **comments, posts, articles and private messages** and
 shows the matches grouped by type, newest first, with clickable LinkedIn links and ~40
-characters of context around each occurrence. Two grep-style options relax the match:
+characters of context around each occurrence. Messages are filed per correspondent,
+alphabetically, with a link to the conversation thread (the export has no per-message
+link). Two grep-style options relax the match:
 `-i`/`--ignore-case` (case-insensitive, accents still significant) and `-w`/`--word`
 (whole word only). See
 [docs/superpowers/specs/2026-07-24-search-options-design.md](docs/superpowers/specs/2026-07-24-search-options-design.md).

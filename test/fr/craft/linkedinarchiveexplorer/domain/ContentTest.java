@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 class ContentTest {
 
   @Test
-  void aMessageCannotExistWithoutItsCorrespondent() {
+  void aMessageIsAMessageNotAContent() {
     assertThrows(
         IllegalArgumentException.class,
         () -> new Content(ContentType.MESSAGE, Optional.empty(), "https://li/t/1/", "hello"));

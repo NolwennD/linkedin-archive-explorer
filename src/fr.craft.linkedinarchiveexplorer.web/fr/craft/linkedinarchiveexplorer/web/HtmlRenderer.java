@@ -6,6 +6,7 @@ import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
+import fr.craft.linkedinarchiveexplorer.domain.MessageHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
 import fr.craft.linkedinarchiveexplorer.domain.WordScope;
@@ -197,14 +198,14 @@ public final class HtmlRenderer {
   }
 
   /** A person, their conversation link(s) once, and below them their matching messages. */
-  private String correspondent(Correspondent who, List<SearchHit> hits) {
+  private String correspondent(Correspondent who, List<MessageHit> hits) {
     record Rendered(String threads, String messages) {}
     Rendered rendered =
         hits.stream()
             .collect(
                 teeing(
                     mapping(
-                        SearchHit::url,
+                        MessageHit::url,
                         collectingAndThen(toCollection(LinkedHashSet::new), this::links)),
                     mapping(this::message, joining()),
                     Rendered::new));

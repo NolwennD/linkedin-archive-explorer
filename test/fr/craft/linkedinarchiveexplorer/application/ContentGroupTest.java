@@ -1,9 +1,13 @@
 package fr.craft.linkedinarchiveexplorer.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import fr.craft.linkedinarchiveexplorer.domain.Body;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
+import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
+import fr.craft.linkedinarchiveexplorer.domain.Message;
+import fr.craft.linkedinarchiveexplorer.domain.MessageHit;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
@@ -17,15 +21,25 @@ import org.junit.jupiter.api.Test;
 
 class ContentGroupTest {
 
+  @Test
+  void refusesAHitOfAnotherTypeThanItsOwn() {
+    ContentHit comment =
+        new ContentHit(
+            new Content(ContentType.COMMENT, "https://li/c/1", "x"),
+            List.of(new Excerpt("", new Match(0, 1, "x"), "")));
+
+    assertThrows(
+        IllegalArgumentException.class, () -> new ContentGroup(ContentType.MESSAGE, List.of(comment)));
+  }
+
   private static SearchHit message(String who, String day) {
-    Content content =
-        new Content(
-            ContentType.MESSAGE,
+    Message message =
+        new Message(
             Optional.of(LocalDate.parse(day)),
             "https://li/thread/" + who + "/",
             new Body("x"),
-            Optional.of(new Correspondent(who, Optional.of("https://li/in/" + who))));
-    return new SearchHit(content, List.of(new Excerpt("", new Match(0, 1, "x"), "")));
+            new Correspondent(who, Optional.of("https://li/in/" + who)));
+    return new MessageHit(message, List.of(new Excerpt("", new Match(0, 1, "x"), "")));
   }
 
   @Nested
@@ -59,27 +73,25 @@ class ContentGroupTest {
     }
 
     private SearchHit group(String title) {
-      Content content =
-          new Content(
-              ContentType.MESSAGE,
+      Message message =
+          new Message(
               Optional.empty(),
               "https://li/thread/" + title + "/",
               new Body("x"),
-              Optional.of(new Correspondent(title, Optional.empty())));
-      return new SearchHit(content, List.of(new Excerpt("", new Match(0, 1, "x"), "")));
+              new Correspondent(title, Optional.empty()));
+      return new MessageHit(message, List.of(new Excerpt("", new Match(0, 1, "x"), "")));
     }
 
     @Test
     void keepsTwoPeopleOfTheSameNameApart() {
       SearchHit first = message("Alice", "2024-01-01");
-      Content other =
-          new Content(
-              ContentType.MESSAGE,
+      Message other =
+          new Message(
               Optional.empty(),
               "https://li/thread/other/",
               new Body("x"),
-              Optional.of(new Correspondent("Alice", Optional.of("https://li/in/alice2"))));
-      SearchHit second = new SearchHit(other, first.excerpts());
+              new Correspondent("Alice", Optional.of("https://li/in/alice2")));
+      SearchHit second = new MessageHit(other, first.excerpts());
 
       assertEquals(2, new ContentGroup(ContentType.MESSAGE, List.of(first, second)).byCorrespondent().size());
     }

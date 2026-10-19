@@ -5,17 +5,17 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Literal, case- and accent-sensitive substring search (grep-style). Each content is
+ * Literal, case- and accent-sensitive substring search (grep-style). Each item is
  * reported at most once.
  */
 public final class SearchEngine {
 
-  public List<SearchHit> search(SearchTerm term, Collection<Content> contents) {
+  public List<SearchHit> search(SearchTerm term, Collection<? extends Searchable> searchables) {
     List<SearchHit> hits = new ArrayList<>();
-    for (Content content : contents) {
-      List<Excerpt> excerpts = Excerpt.excerptsFor(term, content.text());
+    for (Searchable searchable : searchables) {
+      List<Excerpt> excerpts = Excerpt.excerptsFor(term, searchable.text());
       if (!excerpts.isEmpty()) {
-        hits.add(new SearchHit(content, excerpts));
+        hits.add(searchable.hit(excerpts));
       }
     }
     return hits;

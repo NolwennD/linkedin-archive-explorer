@@ -4,33 +4,22 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-/** One matched content and every excerpt where the term occurs in it. */
-public record SearchHit(Content content, List<Excerpt> excerpts) {
+/** One matched item and every excerpt where the term occurs in it. */
+public sealed interface SearchHit permits ContentHit, MessageHit {
 
-  public SearchHit(Content content, List<Excerpt> excerpts) {
-    if (content == null) {
-      throw new IllegalArgumentException("A search hit must reference a content");
-    }
+  ContentType type();
+
+  String url();
+
+  Optional<LocalDate> date();
+
+  List<Excerpt> excerpts();
+
+  /** What every kind of hit requires of its excerpts: at least one, and unmodifiable. */
+  static List<Excerpt> requireExcerpts(List<Excerpt> excerpts) {
     if (excerpts == null || excerpts.isEmpty()) {
       throw new IllegalArgumentException("A search hit must have at least one excerpt");
     }
-    this.content = content;
-    this.excerpts = List.copyOf(excerpts);
-  }
-
-  public ContentType type() {
-    return content.type();
-  }
-
-  public String url() {
-    return content.url();
-  }
-
-  public Optional<Correspondent> correspondent() {
-    return content.correspondent();
-  }
-
-  public Optional<LocalDate> date() {
-    return content.date();
+    return List.copyOf(excerpts);
   }
 }

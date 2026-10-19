@@ -1,7 +1,8 @@
 package fr.craft.linkedinarchiveexplorer.application;
 
-import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
+import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
+import fr.craft.linkedinarchiveexplorer.domain.MessageHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import java.text.Collator;
 import java.time.LocalDate;
@@ -39,15 +40,20 @@ public record ContentGroup(ContentType type, List<SearchHit> hits) {
     if (hits == null || hits.isEmpty()) {
       throw new IllegalArgumentException("A content group must have at least one hit");
     }
+    if (hits.stream().anyMatch(hit -> hit.type() != type)) {
+      throw new IllegalArgumentException("A content group can only hold hits of its own type");
+    }
     this.type = type;
     this.hits = hits.stream().sorted(BY_DATE_DESCENDING).toList();
   }
 
   /** The hits of a message group filed by correspondent, alphabetically, each newest first. */
-  public Map<Correspondent, List<SearchHit>> byCorrespondent() {
-    Map<Correspondent, List<SearchHit>> filed = new TreeMap<>(ALPHABETICALLY);
+  public Map<Correspondent, List<MessageHit>> byCorrespondent() {
+    Map<Correspondent, List<MessageHit>> filed = new TreeMap<>(ALPHABETICALLY);
     for (SearchHit hit : hits) {
-      hit.correspondent().ifPresent(who -> filed.computeIfAbsent(who, key -> new ArrayList<>()).add(hit));
+      if (hit instanceof MessageHit message) {
+        filed.computeIfAbsent(message.correspondent(), key -> new ArrayList<>()).add(message);
+      }
     }
     return filed;
   }

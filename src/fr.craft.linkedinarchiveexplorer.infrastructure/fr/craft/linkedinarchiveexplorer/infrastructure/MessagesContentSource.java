@@ -1,10 +1,9 @@
 package fr.craft.linkedinarchiveexplorer.infrastructure;
 
 import fr.craft.linkedinarchiveexplorer.domain.Body;
-import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentSource;
-import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
+import fr.craft.linkedinarchiveexplorer.domain.Message;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -37,7 +36,7 @@ public final class MessagesContentSource implements ContentSource {
   }
 
   @Override
-  public List<Content> load() {
+  public List<Message> load() {
     return archive
         .readFirst(name -> name.equals("messages.csv"))
         .map(this::toContents)
@@ -47,7 +46,7 @@ public final class MessagesContentSource implements ContentSource {
   private static final List<String> COLUMNS =
       List.of("CONVERSATION ID", "CONVERSATION TITLE", "FROM", "SENDER PROFILE URL", "TO", "RECIPIENT PROFILE URLS", "DATE", "CONTENT");
 
-  private List<Content> toContents(String csv) {
+  private List<Message> toContents(String csv) {
     List<CsvRow> rows = Csv.parse(csv);
     // A file of another shape must not stop the comments, posts and articles from loading.
     if (rows.isEmpty() || !rows.getFirst().headers().containsAll(COLUMNS)) {
@@ -60,20 +59,19 @@ public final class MessagesContentSource implements ContentSource {
       participate(participants, me, List.of(row.get("FROM")), List.of(row.get("SENDER PROFILE URL")));
       participate(participants, me, split(row.get("TO")), split(row.get("RECIPIENT PROFILE URLS")));
     }
-    List<Content> contents = new ArrayList<>();
+    List<Message> messages = new ArrayList<>();
     for (CsvRow row : rows) {
       String id = row.get("CONVERSATION ID");
       if (!id.isBlank() && !row.get("CONTENT").isBlank()) {
-        contents.add(
-            new Content(
-                ContentType.MESSAGE,
+        messages.add(
+            new Message(
                 LinkedInDates.parse(row.get("DATE")),
                 THREAD + id + "/",
                 new Body(row.get("CONTENT")),
-                Optional.of(filedUnder(others.get(id), row.get("CONVERSATION TITLE")))));
+                filedUnder(others.get(id), row.get("CONVERSATION TITLE"))));
       }
     }
-    return contents;
+    return messages;
   }
 
   /** The profile present in the most conversations — the user is in all of them. */

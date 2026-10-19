@@ -8,10 +8,13 @@ import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
 import fr.craft.linkedinarchiveexplorer.domain.Body;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
+import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
 import fr.craft.linkedinarchiveexplorer.domain.Match;
+import fr.craft.linkedinarchiveexplorer.domain.Message;
+import fr.craft.linkedinarchiveexplorer.domain.MessageHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
 import fr.craft.linkedinarchiveexplorer.domain.WordScope;
@@ -40,7 +43,7 @@ class HtmlRendererTest {
 
   private static SearchHit hit(ContentType type, String url, LocalDate date, Excerpt... excerpts) {
     Content content = new Content(type, Optional.ofNullable(date), url, "text");
-    return new SearchHit(content, List.of(excerpts));
+    return new ContentHit(content, List.of(excerpts));
   }
 
   private static SearchResults results(SearchHit... hits) {
@@ -444,14 +447,9 @@ class HtmlRendererTest {
   class Messages {
 
     private SearchHit message(String who, Optional<String> profile, String thread) {
-      Content content =
-          new Content(
-              ContentType.MESSAGE,
-              Optional.of(A_DAY),
-              thread,
-              new Body("text"),
-              Optional.of(new Correspondent(who, profile)));
-      return new SearchHit(content, List.of(excerpt("a ", "foo", " b")));
+      Message message =
+          new Message(Optional.of(A_DAY), thread, new Body("text"), new Correspondent(who, profile));
+      return new MessageHit(message, List.of(excerpt("a ", "foo", " b")));
     }
 
     @Test

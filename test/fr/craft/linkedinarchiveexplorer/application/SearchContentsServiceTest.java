@@ -4,9 +4,11 @@ import static fr.craft.linkedinarchiveexplorer.domain.ContentType.ARTICLE;
 import static fr.craft.linkedinarchiveexplorer.domain.ContentType.COMMENT;
 import static fr.craft.linkedinarchiveexplorer.domain.ContentType.POST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import fr.craft.linkedinarchiveexplorer.domain.Content;
+import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
 import fr.craft.linkedinarchiveexplorer.domain.ContentSource;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.SearchEngine;
@@ -30,6 +32,12 @@ class SearchContentsServiceTest {
     SearchContentsService service =
         new SearchContentsService(List.of(new FakeContentSource(contents)), new SearchEngine());
     return service.search(SearchTerm.literal(term));
+  }
+
+  private static List<String> texts(SearchResults results) {
+    return results.groups().getFirst().hits().stream()
+        .map(hit -> assertInstanceOf(ContentHit.class, hit).content().text().value())
+        .toList();
   }
 
   @Test
@@ -65,7 +73,7 @@ class SearchContentsServiceTest {
             dated(COMMENT, "2024-03-01", "x recent"),
             dated(COMMENT, "2024-02-01", "x middle"));
 
-    List<String> texts = results.groups().getFirst().hits().stream().map(h -> h.content().text().value()).toList();
+    List<String> texts = texts(results);
     assertEquals(List.of("x recent", "x middle", "x old"), texts);
   }
 
@@ -77,7 +85,7 @@ class SearchContentsServiceTest {
             content(POST, Optional.empty(), "x undated"),
             dated(POST, "2024-01-01", "x dated"));
 
-    List<String> texts = results.groups().getFirst().hits().stream().map(h -> h.content().text().value()).toList();
+    List<String> texts = texts(results);
     assertEquals(List.of("x dated", "x undated"), texts);
   }
 

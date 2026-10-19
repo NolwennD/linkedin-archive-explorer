@@ -5,6 +5,7 @@ import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
+import fr.craft.linkedinarchiveexplorer.domain.MessageHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
 import static java.util.stream.Collectors.collectingAndThen;
@@ -62,14 +63,14 @@ public final class TerminalRenderer {
   }
 
   /** The conversation links, each once, beside the name: a person may have several threads. */
-  private String correspondent(Correspondent who, List<SearchHit> hits) {
+  private String correspondent(Correspondent who, List<MessageHit> hits) {
     record Rendered(String threads, String messages) {}
     Rendered rendered =
         hits.stream()
             .collect(
                 teeing(
                     mapping(
-                        SearchHit::url,
+                        MessageHit::url,
                         collectingAndThen(toCollection(LinkedHashSet::new), this::links)),
                     mapping(hit -> hit(formatDate(hit).stripTrailing(), hit), joining()),
                     Rendered::new));

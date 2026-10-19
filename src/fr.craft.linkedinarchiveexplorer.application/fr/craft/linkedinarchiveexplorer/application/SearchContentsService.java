@@ -1,8 +1,8 @@
 package fr.craft.linkedinarchiveexplorer.application;
 
-import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentSource;
 import fr.craft.linkedinarchiveexplorer.domain.SearchEngine;
+import fr.craft.linkedinarchiveexplorer.domain.Searchable;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
 
 import java.util.List;
@@ -10,7 +10,7 @@ import java.util.List;
 public final class SearchContentsService {
 
   private final SearchEngine engine;
-  private final List<Content> content;
+  private final List<? extends Searchable> content;
 
   public SearchContentsService(List<ContentSource> sources, SearchEngine engine) {
     if (sources == null || engine == null) {
@@ -24,7 +24,7 @@ public final class SearchContentsService {
     return SearchResults.from(engine.search(term, content));
   }
 
-  private static List<Content> loadAllContent(List<ContentSource> sources) {
+  private static List<? extends Searchable> loadAllContent(List<ContentSource> sources) {
     return sources.stream().flatMap(source -> source.load().stream()).toList();
   }
 

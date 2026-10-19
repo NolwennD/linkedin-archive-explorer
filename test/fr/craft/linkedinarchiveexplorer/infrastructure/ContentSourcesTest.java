@@ -7,6 +7,7 @@ import fr.craft.linkedinarchiveexplorer.domain.Body;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
+import fr.craft.linkedinarchiveexplorer.domain.Message;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -69,7 +70,7 @@ class ContentSourcesTest {
         "CONVERSATION ID,CONVERSATION TITLE,FROM,SENDER PROFILE URL,TO,RECIPIENT PROFILE URLS,DATE,SUBJECT,CONTENT,FOLDER,ATTACHMENTS,IS MESSAGE DRAFT,IS CONVERSATION DRAFT\n";
     private static final String ME = "me,https://li/in/me";
 
-    private static List<Content> load(String... rows) {
+    private static List<Message> load(String... rows) {
       return new MessagesContentSource(
               new FakeArchiveReader().with("messages.csv", HEADER + String.join("\n", rows) + "\n"))
           .load();
@@ -77,37 +78,36 @@ class ContentSourcesTest {
 
     @Test
     void filesAMessageUnderTheOtherPersonAndLinksToTheThread() {
-      List<Content> contents =
+      List<Message> contents =
           load(
               "c1,,Rose,https://li/in/rose,me,https://li/in/me,2026-07-20 15:59:21 UTC,,hello there,INBOX,,No,No",
               "c1,,me,https://li/in/me,Rose,https://li/in/rose,2026-07-19 10:00:00 UTC,,my answer,INBOX,,No,No",
               "c2,,me,https://li/in/me,Paul,https://li/in/paul,2026-07-18 10:00:00 UTC,,other chat,INBOX,,No,No");
 
       assertEquals(3, contents.size());
-      Content message = contents.getFirst();
-      assertEquals(ContentType.MESSAGE, message.type());
+      Message message = contents.getFirst();
       assertEquals("https://www.linkedin.com/messaging/thread/c1/", message.url());
       assertEquals(new Body("hello there"), message.text());
       assertEquals(LocalDate.of(2026, 7, 20), message.date().orElseThrow());
-      assertEquals(new Correspondent("Rose", Optional.of("https://li/in/rose")), message.correspondent().orElseThrow());
+      assertEquals(new Correspondent("Rose", Optional.of("https://li/in/rose")), message.correspondent());
       assertEquals(message.correspondent(), contents.get(1).correspondent());
     }
 
     @Test
     void filesAGroupConversationUnderItsTitleElseUnderEveryoneButTheUser() {
-      List<Content> contents =
+      List<Message> contents =
           load(
               "g1,Round table,Ann,https://li/in/ann,\"me,Bob\",\"https://li/in/me,https://li/in/bob\",2026-01-01 00:00:00 UTC,,hi,INBOX,,No,No",
               "g2,,Ann,https://li/in/ann,\"me,Bob\",\"https://li/in/me,https://li/in/bob\",2026-01-01 00:00:00 UTC,,hi,INBOX,,No,No",
               "c3,,me,https://li/in/me,Paul,https://li/in/paul,2026-01-01 00:00:00 UTC,,yo,INBOX,,No,No");
 
-      assertEquals(new Correspondent("Round table", Optional.empty()), contents.getFirst().correspondent().orElseThrow());
-      assertEquals(new Correspondent("Ann, Bob", Optional.empty()), contents.get(1).correspondent().orElseThrow());
+      assertEquals(new Correspondent("Round table", Optional.empty()), contents.getFirst().correspondent());
+      assertEquals(new Correspondent("Ann, Bob", Optional.empty()), contents.get(1).correspondent());
     }
 
     @Test
     void stillFindsTheMessagesWhenTheUserCannotBeTold() {
-      List<Content> contents =
+      List<Message> contents =
           load("c1,,Rose,https://li/in/rose,me,https://li/in/me,2026-07-20 15:59:21 UTC,,hello,INBOX,,No,No");
 
       assertEquals(1, contents.size());
@@ -116,15 +116,15 @@ class ContentSourcesTest {
 
     @Test
     void keepsAnUnlinkedParticipantWhenNoProfileLinkAtAll() {
-      List<Content> contents = load("c1,,Rose,,Paul,,2026-07-20 15:59:21 UTC,,hello,INBOX,,No,No");
+      List<Message> contents = load("c1,,Rose,,Paul,,2026-07-20 15:59:21 UTC,,hello,INBOX,,No,No");
 
       assertEquals(1, contents.size());
-      assertTrue(contents.getFirst().correspondent().orElseThrow().name().contains("Rose"));
+      assertTrue(contents.getFirst().correspondent().name().contains("Rose"));
     }
 
     @Test
     void yieldsNothingRatherThanFailingWhenTheFileHasAnotherShape() {
-      List<Content> contents =
+      List<Message> contents =
           new MessagesContentSource(new FakeArchiveReader().with("messages.csv", "FROM,CONTENT\nRose,hello\n")).load();
 
       assertTrue(contents.isEmpty());

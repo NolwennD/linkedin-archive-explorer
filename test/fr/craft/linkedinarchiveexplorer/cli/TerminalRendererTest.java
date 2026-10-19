@@ -7,10 +7,13 @@ import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.Body;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
+import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
 import fr.craft.linkedinarchiveexplorer.domain.Match;
+import fr.craft.linkedinarchiveexplorer.domain.Message;
+import fr.craft.linkedinarchiveexplorer.domain.MessageHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
 import java.time.LocalDate;
@@ -25,7 +28,7 @@ class TerminalRendererTest {
 
   private static SearchResults oneComment(String url, LocalDate date, Excerpt... excerpts) {
     Content content = new Content(ContentType.COMMENT, Optional.ofNullable(date), url, "text");
-    ContentGroup group = new ContentGroup(ContentType.COMMENT, List.of(new SearchHit(content, List.of(excerpts))));
+    ContentGroup group = new ContentGroup(ContentType.COMMENT, List.of(new ContentHit(content, List.of(excerpts))));
     return new SearchResults(List.of(group));
   }
 
@@ -103,7 +106,7 @@ class TerminalRendererTest {
       Content article = new Content(ContentType.ARTICLE, Optional.empty(), "https://li/a", "text");
       SearchResults results =
           new SearchResults(
-              List.of(new ContentGroup(ContentType.ARTICLE, List.of(new SearchHit(article, List.of(excerpt("x ", "foo", "")))))));
+              List.of(new ContentGroup(ContentType.ARTICLE, List.of(new ContentHit(article, List.of(excerpt("x ", "foo", "")))))));
 
       String output = new TerminalRenderer(false).render(SearchTerm.literal("foo"), results);
 
@@ -116,14 +119,13 @@ class TerminalRendererTest {
   class Messages {
 
     private SearchHit message(String who, String url, String thread) {
-      Content content =
-          new Content(
-              ContentType.MESSAGE,
+      Message message =
+          new Message(
               Optional.of(LocalDate.of(2026, 7, 20)),
               thread,
               new Body("text"),
-              Optional.of(new Correspondent(who, Optional.of(url))));
-      return new SearchHit(content, List.of(excerpt("a ", "foo", " b")));
+              new Correspondent(who, Optional.of(url)));
+      return new MessageHit(message, List.of(excerpt("a ", "foo", " b")));
     }
 
     @Test

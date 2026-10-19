@@ -6,8 +6,7 @@ import java.util.Optional;
 
 /**
  * A single piece of authored content (article, post or comment), unified across sources.
- * {@code date} is empty when the source carries no date (e.g. articles). A private message
- * is not one: it is a {@link Message}.
+ * {@code date} is empty when the source carries no date (e.g. articles).
  */
 public record Content(ContentType type, Optional<LocalDate> date, String url, Body text)
     implements Searchable {
@@ -25,14 +24,12 @@ public record Content(ContentType type, Optional<LocalDate> date, String url, Bo
     if (text == null) {
       throw new IllegalArgumentException("A content text must not be null");
     }
-    if (type == ContentType.MESSAGE) {
-      throw new IllegalArgumentException("A message is a Message, not a Content");
-    }
   }
 
   @Override
-  public SearchHit hit(List<Excerpt> excerpts) {
-    return new ContentHit(this, excerpts);
+  public Optional<SearchHit> find(SearchTerm term) {
+    List<Excerpt> excerpts = Excerpt.excerptsFor(term, text);
+    return excerpts.isEmpty() ? Optional.empty() : Optional.of(new ContentHit(this, excerpts));
   }
 
   /** Convenience: sources read plain text, so wrap a raw string as the {@link Body}. */

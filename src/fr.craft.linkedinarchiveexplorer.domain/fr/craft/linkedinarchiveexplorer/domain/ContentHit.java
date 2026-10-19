@@ -15,11 +15,6 @@ public record ContentHit(Content content, List<Excerpt> excerpts) implements Sea
   }
 
   @Override
-  public ContentType type() {
-    return content.type();
-  }
-
-  @Override
   public String url() {
     return content.url();
   }

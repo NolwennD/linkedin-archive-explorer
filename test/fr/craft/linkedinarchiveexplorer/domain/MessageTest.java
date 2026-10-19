@@ -29,7 +29,6 @@ class MessageTest {
 
     MessageHit hit = assertInstanceOf(MessageHit.class, hits.getFirst());
     assertEquals(ROSE, hit.correspondent());
-    assertEquals(ContentType.MESSAGE, hit.type());
   }
 
   @Test

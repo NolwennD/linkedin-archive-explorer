@@ -1,6 +1,5 @@
 package fr.craft.linkedinarchiveexplorer.application;
 
-import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 
 import static java.util.stream.Collectors.groupingBy;
@@ -9,7 +8,7 @@ import static java.util.stream.Collectors.toUnmodifiableList;
 import java.util.EnumMap;
 import java.util.List;
 
-/** The outcome of a search: non-empty groups, in canonical content-type order. */
+/** The outcome of a search: non-empty groups, in canonical section order. */
 public record SearchResults(List<ContentGroup> groups) {
 
   public SearchResults(List<ContentGroup> groups) {
@@ -22,7 +21,7 @@ public record SearchResults(List<ContentGroup> groups) {
   public static SearchResults from(List<SearchHit> hits) {
     return new SearchResults(
         hits.stream()
-            .collect(groupingBy(SearchHit::type, () -> new EnumMap<>(ContentType.class), toUnmodifiableList()))
+            .collect(groupingBy(Section::of, () -> new EnumMap<>(Section.class), toUnmodifiableList()))
             .entrySet().stream()
             .map(group -> new ContentGroup(group.getKey(), group.getValue()))
             .toList());

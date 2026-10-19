@@ -2,10 +2,13 @@ package fr.craft.linkedinarchiveexplorer.web;
 
 import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
+import fr.craft.linkedinarchiveexplorer.application.Section;
 import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
-import fr.craft.linkedinarchiveexplorer.domain.ContentType;
+import fr.craft.linkedinarchiveexplorer.domain.ConnectionHit;
+import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
+import fr.craft.linkedinarchiveexplorer.domain.Message;
 import fr.craft.linkedinarchiveexplorer.domain.MessageHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
@@ -56,6 +59,7 @@ public final class HtmlRenderer {
       ol { list-style: none; margin: 0; padding: 0; }
       ul { margin: .2rem 0; padding-left: 1.2rem; }
       mark { font-weight: bold; }
+      .field { font-size: .78rem; opacity: .55; }
       footer { border-top: 1px solid; font-size: .78rem; margin-top: 2.5rem; opacity: .55; padding-top: .5rem; }
       """;
 
@@ -164,7 +168,7 @@ public final class HtmlRenderer {
   }
 
   private String group(ContentGroup group) {
-    String id = group.type().name().toLowerCase(Locale.ROOT) + "s";
+    String id = group.section().name().toLowerCase(Locale.ROOT) + "s";
     return """
         <section aria-labelledby="%s">
         <details open>
@@ -174,26 +178,27 @@ public final class HtmlRenderer {
         </details>
         </section>
         """
-        .formatted(id, id, heading(group.type()), group.hits().size(), items(group));
+        .formatted(id, id, heading(group.section()), group.hits().size(), items(group));
   }
 
   private String items(ContentGroup group) {
-    return switch (group.type()) {
+    return switch (group.section()) {
       case MESSAGE ->
           group.byCorrespondent().entrySet().stream()
               .map(entry -> correspondent(entry.getKey(), entry.getValue()))
               .collect(joining());
-      case ARTICLE, POST, COMMENT -> group.hits().stream().map(this::hit).collect(joining());
+      case ARTICLE, POST, COMMENT, CONNECTION -> group.hits().stream().map(this::hit).collect(joining());
     };
   }
 
   /** Title case in the markup; the stylesheet is what shouts it in capitals. */
-  private static String heading(ContentType type) {
-    return switch (type) {
+  private static String heading(Section section) {
+    return switch (section) {
       case ARTICLE -> "Articles";
       case POST -> "Posts";
       case COMMENT -> "Comments";
       case MESSAGE -> "Messages";
+      case CONNECTION -> "Connections";
     };
   }
 
@@ -207,7 +212,7 @@ public final class HtmlRenderer {
                     mapping(
                         MessageHit::url,
                         collectingAndThen(toCollection(LinkedHashSet::new), this::links)),
-                    mapping(this::message, joining()),
+                    mapping(this::hit, joining()),
                     Rendered::new));
     return """
         <li>
@@ -225,35 +230,41 @@ public final class HtmlRenderer {
         .collect(joining());
   }
 
-  /** A message under its person: the conversation link is on the person, not repeated here. */
-  private String message(SearchHit hit) {
-    return """
-        <li>
-        <article>
-        %s<ul>
-        %s</ul>
-        </article>
-        </li>
-        """
-        .formatted(date(hit), excerptItems(hit));
-  }
-
   private String hit(SearchHit hit) {
+    return switch (hit) {
+      case ConnectionHit connection -> item(link(hit.url(), connection.connection().fullName()), hit, labelled(connection));
+      case ContentHit content -> item(link(hit.url(), hit.url()), hit, plain(content.excerpts()));
+      // The conversation link is on the person, not repeated on each of their messages.
+      case MessageHit(Message message, List<Excerpt> excerpts) -> item("", hit, plain(excerpts));
+    };
+  }
+
+  private static String item(String heading, SearchHit hit, String excerpts) {
     return """
         <li>
         <article>
-        <h3><a href="%s">%s</a></h3>
-        %s<ul>
+        %s%s<ul>
         %s</ul>
         </article>
         </li>
         """
-            .formatted(escape(hit.url()), escape(hit.url()), date(hit), excerptItems(hit));
+        .formatted(heading, date(hit), excerpts);
   }
 
-  private static String excerptItems(SearchHit hit) {
-    return hit.excerpts().stream()
-        .map(excerpt -> "<li>" + highlighted(excerpt) + "</li>\n")
+  private static String link(String url, String text) {
+    return "<h3><a href=\"%s\">%s</a></h3>\n".formatted(escape(url), escape(text));
+  }
+
+  private static String plain(List<Excerpt> excerpts) {
+    return excerpts.stream().map(excerpt -> "<li>" + highlighted(excerpt) + "</li>\n").collect(joining());
+  }
+
+  private static String labelled(ConnectionHit connection) {
+    return connection.matches().stream()
+        .map(
+            match ->
+                "<li><span class=\"field\">%s</span> %s</li>\n"
+                    .formatted(match.field().label(), highlighted(match.excerpt())))
         .collect(joining());
   }
 

@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
+import fr.craft.linkedinarchiveexplorer.application.Section;
 import fr.craft.linkedinarchiveexplorer.domain.Body;
+import fr.craft.linkedinarchiveexplorer.domain.Connection;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
@@ -28,7 +30,7 @@ class TerminalRendererTest {
 
   private static SearchResults oneComment(String url, LocalDate date, Excerpt... excerpts) {
     Content content = new Content(ContentType.COMMENT, Optional.ofNullable(date), url, "text");
-    ContentGroup group = new ContentGroup(ContentType.COMMENT, List.of(new ContentHit(content, List.of(excerpts))));
+    ContentGroup group = new ContentGroup(Section.COMMENT, List.of(new ContentHit(content, List.of(excerpts))));
     return new SearchResults(List.of(group));
   }
 
@@ -106,7 +108,7 @@ class TerminalRendererTest {
       Content article = new Content(ContentType.ARTICLE, Optional.empty(), "https://li/a", "text");
       SearchResults results =
           new SearchResults(
-              List.of(new ContentGroup(ContentType.ARTICLE, List.of(new ContentHit(article, List.of(excerpt("x ", "foo", "")))))));
+              List.of(new ContentGroup(Section.ARTICLE, List.of(new ContentHit(article, List.of(excerpt("x ", "foo", "")))))));
 
       String output = new TerminalRenderer(false).render(SearchTerm.literal("foo"), results);
 
@@ -142,6 +144,31 @@ class TerminalRendererTest {
           output.indexOf("Alice  https://li/t/2/\n[2026-07-20]\n   • a foo b\n")
               < output.indexOf("Rose  https://li/t/1/\n[2026-07-20]\n   • a foo b\n[2026-07-20]\n"),
           output);
+    }
+  }
+
+  @Nested
+  class Connections {
+
+    private SearchResults ada() {
+      Connection ada =
+          new Connection("Ada", "Lovelace", "https://li/in/ada", "Analytical Engines", "Engineer", Optional.of(LocalDate.of(2025, 3, 4)));
+      return SearchResults.from(List.of(ada.find(SearchTerm.literal("Engine")).orElseThrow()));
+    }
+
+    @Test
+    void showsTheNameTheProfileLinkAndWhichFieldMatched() {
+      String output = new TerminalRenderer(false).render(SearchTerm.literal("Engine"), ada());
+
+      assertTrue(output.contains("CONNECTIONS\n───────────\n"), output);
+      assertTrue(output.contains("[2025-03-04] Ada Lovelace  https://li/in/ada\n   • Company: Analytical Engines\n"), output);
+    }
+
+    @Test
+    void highlightsTheMatchWhenStyled() {
+      String output = new TerminalRenderer(true).render(SearchTerm.literal("Engine"), ada());
+
+      assertTrue(output.contains("Analytical " + ESC + "[1;33mEngine" + ESC + "[0ms"), output);
     }
   }
 }

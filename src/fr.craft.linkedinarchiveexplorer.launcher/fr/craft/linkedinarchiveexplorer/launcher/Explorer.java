@@ -6,6 +6,7 @@ import fr.craft.linkedinarchiveexplorer.domain.SearchEngine;
 import fr.craft.linkedinarchiveexplorer.infrastructure.ArchiveLocator;
 import fr.craft.linkedinarchiveexplorer.infrastructure.ArticlesContentSource;
 import fr.craft.linkedinarchiveexplorer.infrastructure.CommentsContentSource;
+import fr.craft.linkedinarchiveexplorer.infrastructure.ConnectionsContentSource;
 import fr.craft.linkedinarchiveexplorer.infrastructure.JdkArticleTextExtractor;
 import fr.craft.linkedinarchiveexplorer.infrastructure.MessagesContentSource;
 import fr.craft.linkedinarchiveexplorer.infrastructure.SharesContentSource;
@@ -54,7 +55,8 @@ public final class Explorer implements AutoCloseable {
             new CommentsContentSource(zip),
             new SharesContentSource(zip),
             new ArticlesContentSource(zip, new JdkArticleTextExtractor()),
-            new MessagesContentSource(zip));
+            new MessagesContentSource(zip),
+            new ConnectionsContentSource(zip));
     return new Explorer(archive, zip, new SearchContentsService(sources, new SearchEngine()));
   }
 

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
 import fr.craft.linkedinarchiveexplorer.domain.Body;
+import fr.craft.linkedinarchiveexplorer.domain.Connection;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
@@ -474,6 +475,40 @@ class HtmlRendererTest {
 
       assertFalse(html.contains("<script>x"), html);
       assertTrue(html.contains("&lt;script&gt;x&lt;/script&gt;"), html);
+    }
+  }
+
+  @Nested
+  class Connections {
+
+    private String render(Connection connection, String term) {
+      SearchResults results = SearchResults.from(List.of(connection.find(SearchTerm.literal(term)).orElseThrow()));
+      return renderer.render(SearchTerm.literal(term), results, ONE_ARCHIVE);
+    }
+
+    @Test
+    void linksTheNameToTheProfileAndLabelsTheMatchedField() {
+      Connection ada =
+          new Connection("Ada", "Lovelace", "https://li/in/ada", "Analytical Engines", "", Optional.of(A_DAY));
+
+      String html = render(ada, "Engine");
+
+      assertTrue(html.contains("<h2 id=\"connections\">Connections <span class=\"count\">(1)</span></h2>"), html);
+      assertTrue(html.contains("<h3><a href=\"https://li/in/ada\">Ada Lovelace</a></h3>"), html);
+      assertTrue(html.contains("<li><span class=\"field\">Company</span> Analytical <mark>Engine</mark>s</li>"), html);
+    }
+
+    @Test
+    void escapesWhatTheProfileCarries() {
+      Connection hostile =
+          new Connection("<b>Ada</b>", "\"Lovelace\"", "https://li/in/a\"b", "<script>x</script>", "", Optional.empty());
+
+      String html = render(hostile, "x");
+
+      assertFalse(html.contains("<script>x"), html);
+      assertFalse(html.contains("<b>Ada"), html);
+      assertTrue(html.contains("&lt;b&gt;Ada&lt;/b&gt;"), html);
+      assertTrue(html.contains("href=\"https://li/in/a&quot;b\""), html);
     }
   }
 }

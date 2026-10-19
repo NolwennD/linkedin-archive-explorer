@@ -5,9 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 /** One matched item and every excerpt where the term occurs in it. */
-public sealed interface SearchHit permits ContentHit, MessageHit {
-
-  ContentType type();
+public sealed interface SearchHit permits ContentHit, MessageHit, ConnectionHit {
 
   String url();
 

@@ -2,7 +2,9 @@ package fr.craft.linkedinarchiveexplorer.cli;
 
 import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
-import fr.craft.linkedinarchiveexplorer.domain.ContentType;
+import fr.craft.linkedinarchiveexplorer.application.Section;
+import fr.craft.linkedinarchiveexplorer.domain.ConnectionHit;
+import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
 import fr.craft.linkedinarchiveexplorer.domain.MessageHit;
@@ -47,18 +49,17 @@ public final class TerminalRenderer {
   }
 
   private String group(ContentGroup group) {
-    String heading = heading(group.type());
+    String heading = heading(group.section());
     return bold(heading) + NEWLINE + "─".repeat(heading.length()) + NEWLINE + body(group);
   }
 
   private String body(ContentGroup group) {
-    return switch (group.type()) {
+    return switch (group.section()) {
       case MESSAGE ->
           group.byCorrespondent().entrySet().stream()
               .map(entry -> correspondent(entry.getKey(), entry.getValue()))
               .collect(joining());
-      case ARTICLE, POST, COMMENT ->
-          group.hits().stream().map(hit -> hit(hitHeader(hit), hit)).collect(joining());
+      case ARTICLE, POST, COMMENT, CONNECTION -> group.hits().stream().map(this::hit).collect(joining());
     };
   }
 
@@ -72,7 +73,7 @@ public final class TerminalRenderer {
                     mapping(
                         MessageHit::url,
                         collectingAndThen(toCollection(LinkedHashSet::new), this::links)),
-                    mapping(hit -> hit(formatDate(hit).stripTrailing(), hit), joining()),
+                    mapping(this::hit, joining()),
                     Rendered::new));
     return bold(who.name()) + rendered.threads() + NEWLINE + rendered.messages();
   }
@@ -81,23 +82,48 @@ public final class TerminalRenderer {
     return urls.stream().map(url -> "  " + link(url)).collect(joining());
   }
 
-  private String hit(String header, SearchHit hit) {
-    String excerpts =
-        hit.excerpts().stream().map(excerpt -> "   • " + highlighted(excerpt) + NEWLINE).collect(joining());
-    return (header.isEmpty() ? "" : header + NEWLINE) + excerpts;
+  private String hit(SearchHit hit) {
+    String header = hitHeader(hit);
+    return (header.isEmpty() ? "" : header + NEWLINE) + bullets(hit);
   }
 
-  private static String heading(ContentType type) {
-    return switch (type) {
+  private String bullets(SearchHit hit) {
+    return switch (hit) {
+      case ConnectionHit connection ->
+          connection.matches().stream()
+              .map(match -> bullet(match.field().label() + ": ", match.excerpt()))
+              .collect(joining());
+      case ContentHit content -> bullets(content.excerpts());
+      case MessageHit message -> bullets(message.excerpts());
+    };
+  }
+
+  private String bullets(List<Excerpt> excerpts) {
+    return excerpts.stream().map(excerpt -> bullet("", excerpt)).collect(joining());
+  }
+
+  private String bullet(String label, Excerpt excerpt) {
+    return "   • " + label + highlighted(excerpt) + NEWLINE;
+  }
+
+  private static String heading(Section section) {
+    return switch (section) {
       case ARTICLE -> "ARTICLES";
       case POST -> "POSTS";
       case COMMENT -> "COMMENTS";
       case MESSAGE -> "MESSAGES";
+      case CONNECTION -> "CONNECTIONS";
     };
   }
 
+  /** A message's link is on its correspondent, not repeated on each message. */
   private String hitHeader(SearchHit hit) {
-    return formatDate(hit) + link(hit.url());
+    return switch (hit) {
+      case ConnectionHit connection ->
+          formatDate(hit) + bold(connection.connection().fullName()) + "  " + link(hit.url());
+      case ContentHit content -> formatDate(hit) + link(hit.url());
+      case MessageHit message -> formatDate(hit).stripTrailing();
+    };
   }
 
   private static String formatDate(SearchHit hit) {

@@ -27,7 +27,7 @@ grouped by type and sorted from newest to oldest.
 
 ## Which files it reads
 
-The archive is the `.zip` provided by LinkedIn ("Get a copy of your data"). Three sources
+The archive is the `.zip` provided by LinkedIn ("Get a copy of your data"). Five sources
 are read as-is, without extracting anything to disk:
 
 | Content | File in the archive | Columns / fields used |
@@ -35,9 +35,12 @@ are read as-is, without extracting anything to disk:
 | Comments | `Comments_*.csv` | `Date`, `Link`, `Message` |
 | Posts / shares | `Shares_*.csv` | `Date`, `ShareLink`, `ShareCommentary` |
 | Articles | `Articles/**/*.html` | title, URL (the `<h1>` link) and article text |
+| Private messages | `messages.csv` | `CONVERSATION ID`, `FROM`, `TO`, profile links, `DATE`, `CONTENT` |
+| Connections | `Connections.csv` | `First Name`, `Last Name`, `URL`, `Company`, `Position`, `Connected On` |
 
 Articles exported by LinkedIn have no publication date: they are shown without a date, at
-the end of their group.
+the end of their group. A connection is searched in its name, company and position; the result
+shows which of them matched.
 
 ## Install
 

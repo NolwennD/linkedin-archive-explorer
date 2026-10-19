@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
-import fr.craft.linkedinarchiveexplorer.domain.ContentType;
+import fr.craft.linkedinarchiveexplorer.application.Section;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
 import fr.craft.linkedinarchiveexplorer.domain.WordScope;
 import java.io.IOException;
@@ -117,8 +117,8 @@ class ExplorerTest {
             explorer.service().search(new SearchTerm("kotlin", CaseSensitivity.SENSITIVE, WordScope.ANYWHERE));
 
         assertEquals(
-            List.of(ContentType.ARTICLE, ContentType.POST, ContentType.COMMENT),
-            results.groups().stream().map(ContentGroup::type).toList());
+            List.of(Section.ARTICLE, Section.POST, Section.COMMENT),
+            results.groups().stream().map(ContentGroup::section).toList());
       }
     }
 

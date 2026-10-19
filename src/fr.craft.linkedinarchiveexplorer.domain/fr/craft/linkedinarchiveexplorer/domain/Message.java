@@ -27,7 +27,8 @@ public record Message(Optional<LocalDate> date, String url, Body text, Correspon
   }
 
   @Override
-  public SearchHit hit(List<Excerpt> excerpts) {
-    return new MessageHit(this, excerpts);
+  public Optional<SearchHit> find(SearchTerm term) {
+    List<Excerpt> excerpts = Excerpt.excerptsFor(term, text);
+    return excerpts.isEmpty() ? Optional.empty() : Optional.of(new MessageHit(this, excerpts));
   }
 }

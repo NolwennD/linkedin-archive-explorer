@@ -5,11 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 A tool to **explore a LinkedIn data export**. It runs a literal, grep-style search (case-
-and accent-sensitive by default) over the user's **comments, posts, articles and private messages** and
+and accent-sensitive by default) over the user's **comments, posts, articles, private messages and connections** and
 shows the matches grouped by type, newest first, with clickable LinkedIn links and ~40
 characters of context around each occurrence. Messages are filed per correspondent,
 alphabetically, with a link to the conversation thread (the export has no per-message
-link). Two grep-style options relax the match:
+link). A connection is searched in its full name, company and position (field by field,
+never across two of them) and links to the profile. Two grep-style options relax the match:
 `-i`/`--ignore-case` (case-insensitive, accents still significant) and `-w`/`--word`
 (whole word only). See
 [docs/superpowers/specs/2026-07-24-search-options-design.md](docs/superpowers/specs/2026-07-24-search-options-design.md).
@@ -164,7 +165,13 @@ data/                         the LinkedIn .zip archives (gitignored)
 - **No mock framework** (JDK-only): substitute collaborators with **hand-written fakes**
   on the domain ports.
 - **Type-driven domain**: business concepts are `record`s that validate in their
-  **compact constructor** (see `SearchTerm`, `Content`, `Excerpt`).
+  **compact constructor** (see `SearchTerm`, `Content`, `Excerpt`). What is searched
+  (`Searchable`: `Content`, `Message`, `Connection`) and what a search returns (`SearchHit`:
+  `ContentHit`, `MessageHit`, `ConnectionHit`) are **sealed**: each item builds its own hit in
+  `find(term)`, and the renderers `switch` on the hit exhaustively, so a new kind of result
+  is a compile error everywhere it must be handled. Branch on the hit. `ContentType` only tells an article, a
+  post and a comment apart inside `Content`; the groups of a result are keyed by `Section`
+  (in `application`: presentation, not model).
 - **Organise tests, never a flat method list**: group related cases in non-static
   `@Nested` inner classes named for the facet under test (see `SearchEngineTest`:
   `Matching`, `Deduplication`, `ContextExcerpts`); when cases differ only by input, use

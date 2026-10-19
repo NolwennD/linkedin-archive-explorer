@@ -19,11 +19,6 @@ public record MessageHit(Message message, List<Excerpt> excerpts) implements Sea
   }
 
   @Override
-  public ContentType type() {
-    return ContentType.MESSAGE;
-  }
-
-  @Override
   public String url() {
     return message.url();
   }

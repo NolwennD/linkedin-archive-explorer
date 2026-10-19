@@ -29,7 +29,7 @@ class ContentGroupTest {
             List.of(new Excerpt("", new Match(0, 1, "x"), "")));
 
     assertThrows(
-        IllegalArgumentException.class, () -> new ContentGroup(ContentType.MESSAGE, List.of(comment)));
+        IllegalArgumentException.class, () -> new ContentGroup(Section.MESSAGE, List.of(comment)));
   }
 
   private static SearchHit message(String who, String day) {
@@ -49,7 +49,7 @@ class ContentGroupTest {
     void filesMessagesByCorrespondentAlphabeticallyIgnoringCaseAndNewestFirst() {
       ContentGroup group =
           new ContentGroup(
-              ContentType.MESSAGE,
+              Section.MESSAGE,
               List.of(
                   message("zoé", "2024-01-01"),
                   message("Zoe", "2024-01-01"),
@@ -69,7 +69,7 @@ class ContentGroupTest {
     void keepsTwoGroupsApartWhoseTitlesOnlyDifferByCase() {
       List<SearchHit> hits = List.of(group("Team"), group("team"));
 
-      assertEquals(2, new ContentGroup(ContentType.MESSAGE, hits).byCorrespondent().size());
+      assertEquals(2, new ContentGroup(Section.MESSAGE, hits).byCorrespondent().size());
     }
 
     private SearchHit group(String title) {
@@ -93,7 +93,7 @@ class ContentGroupTest {
               new Correspondent("Alice", Optional.of("https://li/in/alice2")));
       SearchHit second = new MessageHit(other, first.excerpts());
 
-      assertEquals(2, new ContentGroup(ContentType.MESSAGE, List.of(first, second)).byCorrespondent().size());
+      assertEquals(2, new ContentGroup(Section.MESSAGE, List.of(first, second)).byCorrespondent().size());
     }
   }
 }

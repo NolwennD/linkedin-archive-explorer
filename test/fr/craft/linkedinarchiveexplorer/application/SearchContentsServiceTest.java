@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import fr.craft.linkedinarchiveexplorer.domain.Connection;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
 import fr.craft.linkedinarchiveexplorer.domain.ContentSource;
@@ -54,14 +55,14 @@ class SearchContentsServiceTest {
             dated(POST, "2024-01-01", "x post"),
             content(ARTICLE, Optional.empty(), "x article"));
 
-    assertEquals(List.of(ARTICLE, POST, COMMENT), results.groups().stream().map(ContentGroup::type).toList());
+    assertEquals(List.of(Section.ARTICLE, Section.POST, Section.COMMENT), results.groups().stream().map(ContentGroup::section).toList());
   }
 
   @Test
   void omitsTypesWithoutAnyMatch() {
     SearchResults results = search("x", dated(COMMENT, "2024-01-01", "x only a comment"));
 
-    assertEquals(List.of(COMMENT), results.groups().stream().map(ContentGroup::type).toList());
+    assertEquals(List.of(Section.COMMENT), results.groups().stream().map(ContentGroup::section).toList());
   }
 
   @Test
@@ -101,6 +102,22 @@ class SearchContentsServiceTest {
     SearchResults results = service.search(SearchTerm.literal("x"));
 
     assertEquals(2, results.groups().size());
+  }
+
+  @Test
+  void listsTheConnectionsAfterTheContentGroups() {
+    Connection ada = new Connection("Ada", "x", "https://li/in/ada", "", "", Optional.empty());
+    SearchContentsService service =
+        new SearchContentsService(
+            List.of(
+                () -> List.of(ada),
+                new FakeContentSource(dated(COMMENT, "2024-01-01", "x from a comment"))),
+            new SearchEngine());
+
+    SearchResults results = service.search(SearchTerm.literal("x"));
+
+    assertEquals(
+        List.of(Section.COMMENT, Section.CONNECTION), results.groups().stream().map(ContentGroup::section).toList());
   }
 
   private record FakeContentSource(List<Content> contents) implements ContentSource {

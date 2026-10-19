@@ -1,6 +1,5 @@
 package fr.craft.linkedinarchiveexplorer.application;
 
-import fr.craft.linkedinarchiveexplorer.domain.ContentType;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.MessageHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
@@ -13,8 +12,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
-/** Every {@link SearchHit} of one {@link ContentType}, sorted by date descending. */
-public record ContentGroup(ContentType type, List<SearchHit> hits) {
+/** Every {@link SearchHit} of one {@link Section}, sorted by date descending. */
+public record ContentGroup(Section section, List<SearchHit> hits) {
 
   private static final Comparator<SearchHit> BY_DATE_DESCENDING =
       Comparator.comparing(hit -> hit.date().orElse(LocalDate.MIN), Comparator.reverseOrder());
@@ -33,17 +32,17 @@ public record ContentGroup(ContentType type, List<SearchHit> hits) {
     return collator;
   }
 
-  public ContentGroup(ContentType type, List<SearchHit> hits) {
-    if (type == null) {
-      throw new IllegalArgumentException("A content group must have a type");
+  public ContentGroup(Section section, List<SearchHit> hits) {
+    if (section == null) {
+      throw new IllegalArgumentException("A content group must have a section");
     }
     if (hits == null || hits.isEmpty()) {
       throw new IllegalArgumentException("A content group must have at least one hit");
     }
-    if (hits.stream().anyMatch(hit -> hit.type() != type)) {
-      throw new IllegalArgumentException("A content group can only hold hits of its own type");
+    if (hits.stream().anyMatch(hit -> Section.of(hit) != section)) {
+      throw new IllegalArgumentException("A content group can only hold hits of its own section");
     }
-    this.type = type;
+    this.section = section;
     this.hits = hits.stream().sorted(BY_DATE_DESCENDING).toList();
   }
 

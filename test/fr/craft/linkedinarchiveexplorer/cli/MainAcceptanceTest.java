@@ -70,6 +70,30 @@ class MainAcceptanceTest {
   }
 
   @Test
+  void searchesTheConnectionsOfTheArchiveToo() throws IOException {
+    Path zip = Files.createTempFile("archive", ".zip");
+    zip.toFile().deleteOnExit();
+    String csv =
+        """
+        Notes:
+        "Some email addresses are missing."
+
+        First Name,Last Name,URL,Email Address,Company,Position,Connected On
+        Ada,Lovelace,https://li/in/ada,,Analytical Engines,Engineer,18 Jul 2026
+        """;
+    try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
+      out.putNextEntry(new ZipEntry("Connections.csv"));
+      out.write(csv.getBytes(StandardCharsets.UTF_8));
+      out.closeEntry();
+    }
+
+    assertEquals(0, run("--archive", zip.toString(), "Engines"));
+    assertTrue(out().contains("CONNECTIONS"), out());
+    assertTrue(out().contains("[2026-07-18] Ada Lovelace  https://li/in/ada"), out());
+    assertTrue(out().contains("• Company: Analytical Engines"), out());
+  }
+
+  @Test
   void ignoreCaseFlagMatchesADifferentCase() throws IOException {
     Path archive = archiveWithComment("about Date here");
 

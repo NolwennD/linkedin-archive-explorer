@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import fr.craft.linkedinarchiveexplorer.domain.Body;
 import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentType;
+import fr.craft.linkedinarchiveexplorer.domain.Connection;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Message;
 import java.time.LocalDate;
@@ -162,6 +163,78 @@ class ContentSourcesTest {
       assertEquals("https://www.linkedin.com/pulse/my-article", article.url());
       assertTrue(article.date().isEmpty());
       assertTrue(article.text().value().contains("kotlin"), article.text().value());
+    }
+  }
+
+  @Nested
+  class Connections {
+
+    private static final String NOTES =
+        """
+        Notes:
+        "When exporting your connection data, you may notice that some of the email addresses are missing."
+
+        """;
+    private static final String HEADER = "First Name,Last Name,URL,Email Address,Company,Position,Connected On\n";
+
+    private static List<Connection> load(String... rows) {
+      return new ConnectionsContentSource(
+              new FakeArchiveReader().with("Connections.csv", NOTES + HEADER + String.join("\n", rows) + "\n"))
+          .load();
+    }
+
+    @Test
+    void readsEachConnectionAfterTheNotesThatOpenTheFile() {
+      List<Connection> connections =
+          load(
+              "Ada,Lovelace,https://li/in/ada,ada@example.org,Analytical Engines,Software Engineer,18 Jul 2026",
+              "Alan,Turing,https://li/in/alan,,,,01 Dec 2014");
+
+      assertEquals(2, connections.size());
+      assertEquals(
+          new Connection(
+              "Ada",
+              "Lovelace",
+              "https://li/in/ada",
+              "Analytical Engines",
+              "Software Engineer",
+              Optional.of(LocalDate.of(2026, 7, 18))),
+          connections.getFirst());
+      assertEquals(Optional.of(LocalDate.of(2014, 12, 1)), connections.get(1).connectedOn());
+    }
+
+    @Test
+    void skipsAMemberWhoseProfileIsHidden() {
+      assertTrue(load(",,,,Some company,Some position,18 Jul 2026").isEmpty());
+    }
+
+    @Test
+    void keepsAConnectionWhoseDateIsUnreadable() {
+      assertEquals(Optional.empty(), load("Ada,Lovelace,https://li/in/ada,,,,someday").getFirst().connectedOn());
+    }
+
+    @Test
+    void takesTheHeaderRowAtTheStartOfALineNotTheWordsInTheNotes() {
+      String csv =
+          "Notes:\n\"Columns are First Name, Last Name and so on.\"\n\n" + HEADER + "Ada,Lovelace,https://li/in/ada,,,,18 Jul 2026\n";
+
+      assertEquals(
+          1, new ConnectionsContentSource(new FakeArchiveReader().with("Connections.csv", csv)).load().size());
+    }
+
+    @Test
+    void readsATableThatStartsRightAfterAByteOrderMark() {
+      String csv = "\uFEFF" + HEADER + "Ada,Lovelace,https://li/in/ada,,,,18 Jul 2026\n";
+
+      assertEquals(
+          1, new ConnectionsContentSource(new FakeArchiveReader().with("Connections.csv", csv)).load().size());
+    }
+
+    @Test
+    void yieldsNothingWhenTheFileIsMissingOrHasNoTable() {
+      assertTrue(new ConnectionsContentSource(new FakeArchiveReader()).load().isEmpty());
+      assertTrue(
+          new ConnectionsContentSource(new FakeArchiveReader().with("Connections.csv", "Notes:\nnothing\n")).load().isEmpty());
     }
   }
 }

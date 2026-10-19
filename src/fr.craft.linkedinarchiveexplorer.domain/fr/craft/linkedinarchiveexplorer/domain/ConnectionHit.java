@@ -18,17 +18,7 @@ public record ConnectionHit(Connection connection, List<ConnectionMatch> matches
   }
 
   @Override
-  public String url() {
-    return connection.profileUrl();
-  }
-
-  @Override
   public Optional<LocalDate> date() {
     return connection.connectedOn();
-  }
-
-  @Override
-  public List<Excerpt> excerpts() {
-    return matches.stream().map(ConnectionMatch::excerpt).toList();
   }
 }

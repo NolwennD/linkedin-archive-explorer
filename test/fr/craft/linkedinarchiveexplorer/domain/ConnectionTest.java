@@ -71,13 +71,12 @@ class ConnectionTest {
   class Hit {
 
     @Test
-    void leadsToTheProfileAndCarriesTheConnectionDate() {
+    void carriesTheConnectionDate() {
       Connection dated =
           new Connection("Ada", "Lovelace", "https://li/in/ada", "", "", Optional.of(java.time.LocalDate.of(2025, 3, 4)));
 
       SearchHit hit = dated.find(SearchTerm.literal("Ada")).orElseThrow();
 
-      assertEquals("https://li/in/ada", hit.url());
       assertEquals(Optional.of(java.time.LocalDate.of(2025, 3, 4)), hit.date());
     }
   }

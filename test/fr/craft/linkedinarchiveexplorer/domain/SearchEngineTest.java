@@ -16,6 +16,10 @@ class SearchEngineTest {
 
   private static final SearchEngine ENGINE = new SearchEngine();
 
+  private static List<Excerpt> excerpts(SearchHit hit) {
+    return assertInstanceOf(ContentHit.class, hit).excerpts();
+  }
+
   private static Content comment(String text) {
     return new Content(ContentType.COMMENT, Optional.empty(), "https://example/1", text);
   }
@@ -52,7 +56,7 @@ class SearchEngineTest {
       List<SearchHit> hits = search("world", comment("hello world"));
 
       assertEquals(1, hits.size());
-      assertEquals(1, hits.getFirst().excerpts().size());
+      assertEquals(1, excerpts(hits.getFirst()).size());
     }
 
     @Test
@@ -79,7 +83,7 @@ class SearchEngineTest {
     void highlightsTheRealCaseOfTheText() {
       List<SearchHit> hits = searchIgnoringCase("date", comment("the DATE format"));
 
-      assertEquals(new Match(4, 8, "DATE"), hits.getFirst().excerpts().getFirst().match());
+      assertEquals(new Match(4, 8, "DATE"), excerpts(hits.getFirst()).getFirst().match());
     }
 
     @Test
@@ -143,7 +147,7 @@ class SearchEngineTest {
       List<SearchHit> hits = search("foo", comment("foo then foo again and foo"));
 
       assertEquals(1, hits.size());
-      assertEquals(3, hits.getFirst().excerpts().size());
+      assertEquals(3, excerpts(hits.getFirst()).size());
     }
 
     @Test
@@ -152,7 +156,7 @@ class SearchEngineTest {
       List<SearchHit> hits = search("aa", comment("aaaa"));
 
       assertEquals(1, hits.size());
-      assertEquals(2, hits.getFirst().excerpts().size());
+      assertEquals(2, excerpts(hits.getFirst()).size());
     }
   }
 
@@ -160,7 +164,7 @@ class SearchEngineTest {
   class ContextExcerpts {
 
     private Excerpt firstExcerptOf(String term, String text) {
-      return search(term, comment(text)).getFirst().excerpts().getFirst();
+      return excerpts(search(term, comment(text)).getFirst()).getFirst();
     }
 
     @Test

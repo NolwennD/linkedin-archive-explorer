@@ -32,7 +32,7 @@ class ContentGroupTest {
         IllegalArgumentException.class, () -> new ContentGroup(Section.MESSAGE, List.of(comment)));
   }
 
-  private static SearchHit message(String who, String day) {
+  private static MessageHit message(String who, String day) {
     Message message =
         new Message(
             Optional.of(LocalDate.parse(day)),
@@ -84,7 +84,7 @@ class ContentGroupTest {
 
     @Test
     void keepsTwoPeopleOfTheSameNameApart() {
-      SearchHit first = message("Alice", "2024-01-01");
+      MessageHit first = message("Alice", "2024-01-01");
       Message other =
           new Message(
               Optional.empty(),

@@ -15,11 +15,6 @@ public record ContentHit(Content content, List<Excerpt> excerpts) implements Sea
   }
 
   @Override
-  public String url() {
-    return content.url();
-  }
-
-  @Override
   public Optional<LocalDate> date() {
     return content.date();
   }

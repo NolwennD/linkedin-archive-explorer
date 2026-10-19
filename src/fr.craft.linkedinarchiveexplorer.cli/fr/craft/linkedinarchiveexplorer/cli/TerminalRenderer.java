@@ -3,10 +3,14 @@ package fr.craft.linkedinarchiveexplorer.cli;
 import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.application.Section;
+import fr.craft.linkedinarchiveexplorer.domain.Connection;
 import fr.craft.linkedinarchiveexplorer.domain.ConnectionHit;
+import fr.craft.linkedinarchiveexplorer.domain.ConnectionMatch;
+import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
+import fr.craft.linkedinarchiveexplorer.domain.Message;
 import fr.craft.linkedinarchiveexplorer.domain.MessageHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchHit;
 import fr.craft.linkedinarchiveexplorer.domain.SearchTerm;
@@ -16,9 +20,11 @@ import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.teeing;
 import static java.util.stream.Collectors.toCollection;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Renders {@link SearchResults} for a terminal: groups by type, one clickable link per
@@ -71,7 +77,7 @@ public final class TerminalRenderer {
             .collect(
                 teeing(
                     mapping(
-                        MessageHit::url,
+                        hit -> hit.message().url(),
                         collectingAndThen(toCollection(LinkedHashSet::new), this::links)),
                     mapping(this::hit, joining()),
                     Rendered::new));
@@ -83,19 +89,26 @@ public final class TerminalRenderer {
   }
 
   private String hit(SearchHit hit) {
-    String header = hitHeader(hit);
-    return (header.isEmpty() ? "" : header + NEWLINE) + bullets(hit);
+    return switch (hit) {
+      case ConnectionHit(Connection connection, List<ConnectionMatch> matches) ->
+          formatDate(connection.connectedOn())
+              + bold(connection.fullName())
+              + "  "
+              + link(connection.profileUrl())
+              + NEWLINE
+              + labelled(matches);
+      case ContentHit(Content content, List<Excerpt> excerpts) ->
+          formatDate(content.date()) + link(content.url()) + NEWLINE + bullets(excerpts);
+      // The conversation link is on the correspondent, not repeated on each message.
+      case MessageHit(Message message, List<Excerpt> excerpts) ->
+          message.date().map(day -> "[" + day + "]" + NEWLINE).orElse("") + bullets(excerpts);
+    };
   }
 
-  private String bullets(SearchHit hit) {
-    return switch (hit) {
-      case ConnectionHit connection ->
-          connection.matches().stream()
-              .map(match -> bullet(match.field().label() + ": ", match.excerpt()))
-              .collect(joining());
-      case ContentHit content -> bullets(content.excerpts());
-      case MessageHit message -> bullets(message.excerpts());
-    };
+  private String labelled(List<ConnectionMatch> matches) {
+    return matches.stream()
+        .map(match -> bullet(match.field().label() + ": ", match.excerpt()))
+        .collect(joining());
   }
 
   private String bullets(List<Excerpt> excerpts) {
@@ -116,18 +129,8 @@ public final class TerminalRenderer {
     };
   }
 
-  /** A message's link is on its correspondent, not repeated on each message. */
-  private String hitHeader(SearchHit hit) {
-    return switch (hit) {
-      case ConnectionHit connection ->
-          formatDate(hit) + bold(connection.connection().fullName()) + "  " + link(hit.url());
-      case ContentHit content -> formatDate(hit) + link(hit.url());
-      case MessageHit message -> formatDate(hit).stripTrailing();
-    };
-  }
-
-  private static String formatDate(SearchHit hit) {
-    return hit.date().map(day -> "[" + day + "] ").orElse("");
+  private static String formatDate(Optional<LocalDate> date) {
+    return date.map(day -> "[" + day + "] ").orElse("");
   }
 
   /**

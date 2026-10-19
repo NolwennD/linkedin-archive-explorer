@@ -19,11 +19,6 @@ public record MessageHit(Message message, List<Excerpt> excerpts) implements Sea
   }
 
   @Override
-  public String url() {
-    return message.url();
-  }
-
-  @Override
   public Optional<LocalDate> date() {
     return message.date();
   }

@@ -7,11 +7,8 @@ import java.util.Optional;
 /** One matched item and every excerpt where the term occurs in it. */
 public sealed interface SearchHit permits ContentHit, MessageHit, ConnectionHit {
 
-  String url();
-
+  /** The only thing every kind of hit has in common for the results: when it dates from. */
   Optional<LocalDate> date();
-
-  List<Excerpt> excerpts();
 
   /** What every kind of hit requires of its excerpts: at least one, and unmodifiable. */
   static List<Excerpt> requireExcerpts(List<Excerpt> excerpts) {

@@ -4,7 +4,10 @@ import fr.craft.linkedinarchiveexplorer.application.ContentGroup;
 import fr.craft.linkedinarchiveexplorer.application.SearchResults;
 import fr.craft.linkedinarchiveexplorer.application.Section;
 import fr.craft.linkedinarchiveexplorer.domain.CaseSensitivity;
+import fr.craft.linkedinarchiveexplorer.domain.Connection;
 import fr.craft.linkedinarchiveexplorer.domain.ConnectionHit;
+import fr.craft.linkedinarchiveexplorer.domain.ConnectionMatch;
+import fr.craft.linkedinarchiveexplorer.domain.Content;
 import fr.craft.linkedinarchiveexplorer.domain.ContentHit;
 import fr.craft.linkedinarchiveexplorer.domain.Correspondent;
 import fr.craft.linkedinarchiveexplorer.domain.Excerpt;
@@ -23,7 +26,9 @@ import static java.util.stream.Collectors.toCollection;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.time.LocalDate;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * Renders {@link SearchResults} as one self-contained HTML page: a search form, then a
@@ -210,7 +215,7 @@ public final class HtmlRenderer {
             .collect(
                 teeing(
                     mapping(
-                        MessageHit::url,
+                        hit -> hit.message().url(),
                         collectingAndThen(toCollection(LinkedHashSet::new), this::links)),
                     mapping(this::hit, joining()),
                     Rendered::new));
@@ -232,35 +237,62 @@ public final class HtmlRenderer {
 
   private String hit(SearchHit hit) {
     return switch (hit) {
-      case ConnectionHit connection -> item(link(hit.url(), connection.connection().fullName()), hit, labelled(connection));
-      case ContentHit content -> item(link(hit.url(), hit.url()), hit, plain(content.excerpts()));
-      // The conversation link is on the person, not repeated on each of their messages.
-      case MessageHit(Message message, List<Excerpt> excerpts) -> item("", hit, plain(excerpts));
+      case ConnectionHit(Connection connection, List<ConnectionMatch> matches) ->
+          connection(connection, matches);
+      case ContentHit(Content content, List<Excerpt> excerpts) -> content(content, excerpts);
+      case MessageHit(Message message, List<Excerpt> excerpts) -> message(message, excerpts);
     };
   }
 
-  private static String item(String heading, SearchHit hit, String excerpts) {
+  private static String connection(Connection connection, List<ConnectionMatch> matches) {
     return """
         <li>
         <article>
-        %s%s<ul>
+        <h3><a href="%s">%s</a></h3>
+        %s<ul>
         %s</ul>
         </article>
         </li>
         """
-        .formatted(heading, date(hit), excerpts);
+        .formatted(
+            escape(connection.profileUrl()),
+            escape(connection.fullName()),
+            time(connection.connectedOn()),
+            labelled(matches));
   }
 
-  private static String link(String url, String text) {
-    return "<h3><a href=\"%s\">%s</a></h3>\n".formatted(escape(url), escape(text));
+  private static String content(Content content, List<Excerpt> excerpts) {
+    return """
+        <li>
+        <article>
+        <h3><a href="%s">%s</a></h3>
+        %s<ul>
+        %s</ul>
+        </article>
+        </li>
+        """
+        .formatted(escape(content.url()), escape(content.url()), time(content.date()), plain(excerpts));
+  }
+
+  /** The conversation link is on the person, not repeated on each of their messages. */
+  private static String message(Message message, List<Excerpt> excerpts) {
+    return """
+        <li>
+        <article>
+        %s<ul>
+        %s</ul>
+        </article>
+        </li>
+        """
+        .formatted(time(message.date()), plain(excerpts));
   }
 
   private static String plain(List<Excerpt> excerpts) {
     return excerpts.stream().map(excerpt -> "<li>" + highlighted(excerpt) + "</li>\n").collect(joining());
   }
 
-  private static String labelled(ConnectionHit connection) {
-    return connection.matches().stream()
+  private static String labelled(List<ConnectionMatch> matches) {
+    return matches.stream()
         .map(
             match ->
                 "<li><span class=\"field\">%s</span> %s</li>\n"
@@ -268,8 +300,8 @@ public final class HtmlRenderer {
         .collect(joining());
   }
 
-  private static String date(SearchHit hit) {
-    return hit.date()
+  private static String time(Optional<LocalDate> date) {
+    return date
         .map(
             day ->
                 """

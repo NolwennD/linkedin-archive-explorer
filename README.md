@@ -1,8 +1,8 @@
 # LinkedIn Archive Explorer
 
-A tool to **explore a LinkedIn data export** and quickly find the **comments, posts and
-articles** that mention a given topic — with a snippet of context and a clickable link to
-the content on LinkedIn.
+A tool to **explore a LinkedIn data export** and quickly find the **comments, posts,
+articles, private messages and connections** that mention a given topic — with a snippet
+of context and a clickable link to the content on LinkedIn.
 
 It comes with **two interfaces over the same search engine**: a command line, and a
 [local web page](#web-interface) if you would rather search from a browser.
@@ -11,15 +11,20 @@ You can ask for your data on this [LinkedIn page](https://www.linkedin.com/mypre
 You will receive two archives, first one a few hours later, the second in a few days. **This tool uses the second**. 
 
 Example: searching for `Date(0,0,0)` lists every piece of your content that mentions it,
-grouped by type and sorted from newest to oldest.
+grouped by type and sorted from newest to oldest. Searching for a company name lists the
+people you know there.
 
 ## What it does
 
 - **Literal** search (like `grep`), **case- and accent-sensitive** by default: `Date` ≠
   `date`, `developpeur` ≠ `développeur`. Two `grep`-style options relax it: `-i` ignores
   case, `-w` matches whole words only. Accents always stay significant.
-- Results **grouped by type** (articles, posts, comments) and **sorted by descending
-  date**.
+- Results **grouped by type** (articles, posts, comments, messages, connections) and
+  **sorted by descending date**.
+- **Private messages** are filed **per correspondent**, alphabetically, each with a link to
+  the conversation (the export has no link to a single message).
+- **Connections** are searched in their **name, company and position**; each result links
+  to the person's profile and says which of those fields matched.
 - For each match: a **clickable link** to LinkedIn (OSC 8 hyperlinks in the terminal, plain
   links on the web page) and the **list of excerpts** (~40 characters of context around
   each occurrence, term highlighted).
@@ -39,8 +44,7 @@ are read as-is, without extracting anything to disk:
 | Connections | `Connections.csv` | `First Name`, `Last Name`, `URL`, `Company`, `Position`, `Connected On` |
 
 Articles exported by LinkedIn have no publication date: they are shown without a date, at
-the end of their group. A connection is searched in its name, company and position; the result
-shows which of them matched.
+the end of their group. A connection is dated by when you connected.
 
 ## Install
 

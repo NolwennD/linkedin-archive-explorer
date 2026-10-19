@@ -41,9 +41,10 @@ Read it before making structural changes.
   `javac` / `jar` / `java`, plus `native-image` for the release binary — all commands, no
   build system. (Maven may be used *only* as a one-off downloader for the JUnit jar into
   `lib/`.) Building the **full bundle needs a GraalVM**; running it needs nothing.
-- **Java 17 or newer** — the code is verified to compile and test-pass on JDK 17.
-  (`mise.toml` pins 26 for the dev environment.) Do **not** reach for `HttpHandlers` or
-  `SimpleFileServer` (Java 18+): raising the floor was weighed and rejected, they buy
+- **Java 21 or newer** — the code is verified to compile and test-pass on JDK 21. The floor
+  was raised from 17 for sealed types with pattern matching in `switch` and sequenced
+  collections (`getFirst()`). (`mise.toml` pins 26 for the dev environment.) `HttpHandlers`
+  and `SimpleFileServer` (Java 18+) are now within the floor but still unused: they buy
   three or four lines. See the web UI design, § 2.
 - **Nothing from the archive reaches a page unescaped.** In the `web` module every value
   taken from the archive — and the search term — goes through `HtmlEscaper.escape`. An
@@ -67,7 +68,7 @@ zip cannot carry the executable bit) — see
 - **Run a single test class** (after `./bin/test` has compiled `out/` and `out-test/`):
   `java -jar lib/junit-platform-console-standalone-*.jar execute -cp "out-test:$(find out -mindepth 1 -maxdepth 1 -type d | tr '\n' ':')" --select-class fr.craft.linkedinarchiveexplorer.domain.SearchEngineTest`
 - **Build**: `./bin/build` — modular compile (enforcement) then packages every
-  layer into `dist/linkedin-explorer.jar`. Both compilations pin `--release 17`, so the jar
+  layer into `dist/linkedin-explorer.jar`. Both compilations pin `--release 21`, so the jar
   runs on the documented floor whatever JDK built it. (Windows: `bin\build.cmd`.)
 - **Package a release**: `./bin/package [version]` — builds, then produces the native
   executable (GraalVM `native-image`, from the jar) and the lite bundle (jar + launchers),

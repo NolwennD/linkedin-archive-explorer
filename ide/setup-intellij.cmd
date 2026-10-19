@@ -1,1 +1,1 @@
-@cd /d "%~dp0.." && java --source 17 ide\setup-intellij %*
+@cd /d "%~dp0.." && java --source 21 ide\setup-intellij %*

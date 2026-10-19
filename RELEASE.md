@@ -15,7 +15,7 @@ The design behind all of this, and the reasoning for each choice, is in
 | `linkedin-archive-explorer-<version>-linux-x64.tar.gz` | Linux, no JDK needed | ~8 MB |
 | `linkedin-archive-explorer-<version>-macos-aarch64.tar.gz` | Apple Silicon, no JDK needed | ~8 MB |
 | `linkedin-archive-explorer-<version>-windows-x64.zip` | Windows, no JDK needed | ~8 MB |
-| `linkedin-archive-explorer-<version>-lite.tar.gz` / `.zip` | anyone with **Java 17+** | ~60 KB |
+| `linkedin-archive-explorer-<version>-lite.tar.gz` / `.zip` | anyone with **Java 21+** | ~60 KB |
 | `*.sha256` | one next to each archive | — |
 
 The three fat bundles carry their own Java runtime (a `jlink` image). The lite one carries
@@ -69,7 +69,7 @@ and in the release page. Nothing in the source needs editing before tagging.
 
 1. **Three runners in parallel** — `ubuntu-22.04`, `macos-latest`, `windows-latest` — each
    compiling the binary for its own platform with **GraalVM 25** `native-image`. (The
-   *source* floor stays Java 17, pinned by `--release` in `bin/build` and checked by the CI
+   *source* floor is Java 21, pinned by `--release` in `bin/build` and checked by the CI
    workflow. The two are different things.) Linux is pinned rather than `latest` because a
    native executable links against the build machine's glibc, and that becomes the floor
    every user has to clear; the workflow prints it.

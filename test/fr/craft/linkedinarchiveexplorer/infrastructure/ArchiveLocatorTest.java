@@ -83,7 +83,7 @@ class ArchiveLocatorTest {
       Files.createFile(dir.resolve("Complete_LinkedInDataExport_07-20-2026.zip"));
       Files.createFile(dir.resolve("Complete_LinkedInDataExport_07-21-2026.zip"));
 
-      assertEquals(ArchiveLocator.mostRecent(dir).orElseThrow(), ArchiveLocator.all(dir).get(0));
+      assertEquals(ArchiveLocator.mostRecent(dir).orElseThrow(), ArchiveLocator.all(dir).getFirst());
     }
   }
 

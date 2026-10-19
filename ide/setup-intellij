@@ -1,4 +1,4 @@
-#!/usr/bin/env -S java --source 17
+#!/usr/bin/env -S java --source 21
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,7 +22,7 @@ public final class SetupIntellij {
     copy("ide/linkedin-archive-explorer.iml", "linkedin-archive-explorer.iml");
 
     System.out.println("IntelliJ config installed (.idea/ + linkedin-archive-explorer.iml).");
-    System.out.println("Open the project, then set the Project SDK to a JDK 17+ if prompted.");
+    System.out.println("Open the project, then set the Project SDK to a JDK 21+ if prompted.");
   }
 
   private static void copy(String from, String to) throws IOException {

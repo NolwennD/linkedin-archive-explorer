@@ -1,1 +1,1 @@
-@cd /d "%~dp0" && java --source 17 linkedin-archive-explorer %*
+@cd /d "%~dp0" && java --source 21 linkedin-archive-explorer %*

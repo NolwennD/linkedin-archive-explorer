@@ -17,7 +17,7 @@ final class Csv {
     if (records.isEmpty()) {
       return List.of();
     }
-    List<String> headers = records.get(0);
+    List<String> headers = records.getFirst();
     return records.stream().skip(1).map(row -> new CsvRow(headers, row)).toList();
   }
 

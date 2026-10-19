@@ -15,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -49,13 +50,13 @@ public final class MessagesContentSource implements ContentSource {
   private List<Content> toContents(String csv) {
     List<CsvRow> rows = Csv.parse(csv);
     // A file of another shape must not stop the comments, posts and articles from loading.
-    if (rows.isEmpty() || !rows.get(0).headers().containsAll(COLUMNS)) {
+    if (rows.isEmpty() || !rows.getFirst().headers().containsAll(COLUMNS)) {
       return List.of();
     }
     String me = userProfile(rows);
-    Map<String, Set<Correspondent>> others = new LinkedHashMap<>();
+    Map<String, SequencedSet<Correspondent>> others = new LinkedHashMap<>();
     for (CsvRow row : rows) {
-      Set<Correspondent> participants = others.computeIfAbsent(row.get("CONVERSATION ID"), id -> new LinkedHashSet<>());
+      SequencedSet<Correspondent> participants = others.computeIfAbsent(row.get("CONVERSATION ID"), id -> new LinkedHashSet<>());
       participate(participants, me, List.of(row.get("FROM")), List.of(row.get("SENDER PROFILE URL")));
       participate(participants, me, split(row.get("TO")), split(row.get("RECIPIENT PROFILE URLS")));
     }
@@ -91,8 +92,8 @@ public final class MessagesContentSource implements ContentSource {
     // A tie at the top leaves the user unknown rather than guessed (e.g. a single conversation).
     boolean tied =
         mostPresentFirst.size() > 1
-            && mostPresentFirst.get(0).getValue().size() == mostPresentFirst.get(1).getValue().size();
-    return mostPresentFirst.isEmpty() || tied ? "" : mostPresentFirst.get(0).getKey();
+            && mostPresentFirst.getFirst().getValue().size() == mostPresentFirst.get(1).getValue().size();
+    return mostPresentFirst.isEmpty() || tied ? "" : mostPresentFirst.getFirst().getKey();
   }
 
   /** Names and profile links are comma-separated, in the same order. */
@@ -102,7 +103,7 @@ public final class MessagesContentSource implements ContentSource {
 
   // ponytail: if a name itself contains a comma the two lists no longer line up; the whole
   // field is then taken as one participant instead of guessing where to cut.
-  private static void participate(Set<Correspondent> participants, String me, List<String> names, List<String> urls) {
+  private static void participate(SequencedSet<Correspondent> participants, String me, List<String> names, List<String> urls) {
     if (names.size() != urls.size()) {
       names = List.of(String.join(",", names));
       urls = List.of("");
@@ -117,9 +118,9 @@ public final class MessagesContentSource implements ContentSource {
   }
 
   /** The other person when there is exactly one; else the conversation title, else everyone. */
-  private static Correspondent filedUnder(Set<Correspondent> others, String title) {
+  private static Correspondent filedUnder(SequencedSet<Correspondent> others, String title) {
     if (others.size() == 1) {
-      return others.iterator().next();
+      return others.getFirst();
     }
     String everyone = others.stream().map(Correspondent::name).collect(Collectors.joining(", "));
     String name = !title.isBlank() ? title : !everyone.isEmpty() ? everyone : "(unknown)";

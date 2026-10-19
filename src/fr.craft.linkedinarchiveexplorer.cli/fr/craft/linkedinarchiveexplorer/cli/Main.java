@@ -34,7 +34,7 @@ public final class Main {
       // Java 22+: console() is non-null even when redirected; isTerminal() is authoritative.
       return (boolean) java.io.Console.class.getMethod("isTerminal").invoke(console);
     } catch (ReflectiveOperationException pre22) {
-      // Java 17-21: a non-null console already means an attached terminal.
+      // Java 21: a non-null console already means an attached terminal.
       return true;
     }
   }

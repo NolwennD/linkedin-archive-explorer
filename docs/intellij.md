@@ -14,8 +14,8 @@ est fournie — mais **`.idea/` n'est pas versionné directement** : on versionn
 Le script copie le template vers `.idea/` et crée `linkedin-archive-explorer.iml` à la
 racine. Ouvre ensuite le projet dans IntelliJ.
 
-Puis **une seule étape manuelle** : si IntelliJ signale « SDK '17' is invalid », va dans
-*File → Project Structure → Project* et choisis un **JDK 17 ou plus récent**. (Le nom
+Puis **une seule étape manuelle** : si IntelliJ signale « SDK '21' is invalid », va dans
+*File → Project Structure → Project* et choisis un **JDK 21 ou plus récent**. (Le nom
 d'un SDK est propre à chaque machine, il ne peut pas être versionné.)
 
 ## Pourquoi une config est nécessaire
@@ -45,7 +45,7 @@ Fichiers versionnés dans `ide/` (installés par le script) :
 - `ide/idea/modules.xml` — enregistre ce module IntelliJ.
 - `ide/idea/libraries/junit_platform_console_standalone.xml` — déclare le jar JUnit de
   `lib/` (scope test) pour que les tests résolvent.
-- `ide/idea/misc.xml` — niveau de langage **Java 17**.
+- `ide/idea/misc.xml` — niveau de langage **Java 21**.
 
 `.idea/` et le `.iml` racine sont **gitignorés** : ce sont des artefacts générés.
 IntelliJ y ajoutera ses propres fichiers volatils (`workspace.xml`, `vcs.xml`…) qui, du

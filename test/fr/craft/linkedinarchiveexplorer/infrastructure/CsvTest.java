@@ -111,7 +111,7 @@ class CsvTest {
 
     @Test
     void mapsCellsByHeaderName() {
-      CsvRow row = rows.get(0);
+      CsvRow row = rows.getFirst();
 
       assertEquals("2024-01-01", row.get("Date"));
       assertEquals("hello, world", row.get("Message"));
@@ -119,7 +119,7 @@ class CsvTest {
 
     @Test
     void rejectsAnUnknownColumn() {
-      assertThrows(IllegalArgumentException.class, () -> rows.get(0).get("Nope"));
+      assertThrows(IllegalArgumentException.class, () -> rows.getFirst().get("Nope"));
     }
   }
 }

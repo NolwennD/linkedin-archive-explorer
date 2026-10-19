@@ -28,7 +28,7 @@ class ContentSourcesTest {
       List<Content> contents = new CommentsContentSource(new FakeArchiveReader().with("Comments_1.csv", csv)).load();
 
       assertEquals(1, contents.size());
-      Content comment = contents.get(0);
+      Content comment = contents.getFirst();
       assertEquals(ContentType.COMMENT, comment.type());
       assertEquals("https://li/1", comment.url());
       assertEquals(new Body("hello, world"), comment.text());
@@ -54,7 +54,7 @@ class ContentSourcesTest {
       List<Content> contents = new SharesContentSource(new FakeArchiveReader().with("Shares_1.csv", csv)).load();
 
       assertEquals(1, contents.size());
-      Content post = contents.get(0);
+      Content post = contents.getFirst();
       assertEquals(ContentType.POST, post.type());
       assertEquals("https://li/post", post.url());
       assertEquals(new Body("my post"), post.text());
@@ -84,7 +84,7 @@ class ContentSourcesTest {
               "c2,,me,https://li/in/me,Paul,https://li/in/paul,2026-07-18 10:00:00 UTC,,other chat,INBOX,,No,No");
 
       assertEquals(3, contents.size());
-      Content message = contents.get(0);
+      Content message = contents.getFirst();
       assertEquals(ContentType.MESSAGE, message.type());
       assertEquals("https://www.linkedin.com/messaging/thread/c1/", message.url());
       assertEquals(new Body("hello there"), message.text());
@@ -101,7 +101,7 @@ class ContentSourcesTest {
               "g2,,Ann,https://li/in/ann,\"me,Bob\",\"https://li/in/me,https://li/in/bob\",2026-01-01 00:00:00 UTC,,hi,INBOX,,No,No",
               "c3,,me,https://li/in/me,Paul,https://li/in/paul,2026-01-01 00:00:00 UTC,,yo,INBOX,,No,No");
 
-      assertEquals(new Correspondent("Round table", Optional.empty()), contents.get(0).correspondent().orElseThrow());
+      assertEquals(new Correspondent("Round table", Optional.empty()), contents.getFirst().correspondent().orElseThrow());
       assertEquals(new Correspondent("Ann, Bob", Optional.empty()), contents.get(1).correspondent().orElseThrow());
     }
 
@@ -111,7 +111,7 @@ class ContentSourcesTest {
           load("c1,,Rose,https://li/in/rose,me,https://li/in/me,2026-07-20 15:59:21 UTC,,hello,INBOX,,No,No");
 
       assertEquals(1, contents.size());
-      assertEquals(new Body("hello"), contents.get(0).text());
+      assertEquals(new Body("hello"), contents.getFirst().text());
     }
 
     @Test
@@ -119,7 +119,7 @@ class ContentSourcesTest {
       List<Content> contents = load("c1,,Rose,,Paul,,2026-07-20 15:59:21 UTC,,hello,INBOX,,No,No");
 
       assertEquals(1, contents.size());
-      assertTrue(contents.get(0).correspondent().orElseThrow().name().contains("Rose"));
+      assertTrue(contents.getFirst().correspondent().orElseThrow().name().contains("Rose"));
     }
 
     @Test
@@ -157,7 +157,7 @@ class ContentSourcesTest {
               .load();
 
       assertEquals(1, contents.size());
-      Content article = contents.get(0);
+      Content article = contents.getFirst();
       assertEquals(ContentType.ARTICLE, article.type());
       assertEquals("https://www.linkedin.com/pulse/my-article", article.url());
       assertTrue(article.date().isEmpty());

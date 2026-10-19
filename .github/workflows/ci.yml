@@ -21,8 +21,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 17 = the declared floor (catches accidental use of newer APIs), 21 = current LTS.
-        java: ['17', '25']
+        # 21 = the declared floor (catches accidental use of newer APIs), 25 = latest.
+        java: ['21', '25']
     steps:
       - uses: actions/checkout@v4
 
@@ -37,4 +37,4 @@ jobs:
       # classpath with the vendored JUnit console jar. Invoked directly so it needs neither
       # the executable bit nor `env -S`.
       - name: Run tests
-        run: java --source 17 bin/test
+        run: java --source 21 bin/test

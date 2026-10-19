@@ -1,7 +1,7 @@
 name: Release
 
 # Publishes the two bundles of the binary design on a version tag. The CI workflow is left
-# alone: it keeps testing every push on JDK 17 and 25.
+# alone: it keeps testing every push on JDK 21 and 25.
 on:
   push:
     tags: ['v*']
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # GraalVM, because bin/package compiles the full bundle ahead of time with
-      # native-image. The source floor stays 17, pinned by --release in bin/build and
+      # native-image. The source floor is 21, pinned by --release in bin/build and
       # checked by the CI workflow — the two are not the same thing and do not move
       # together. On Windows this step is also what puts the MSVC toolchain that
       # native-image needs on the path.
@@ -46,10 +46,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests
-        run: java --source 17 bin/test
+        run: java --source 21 bin/test
 
       - name: Package
-        run: java --source 17 bin/package ${GITHUB_REF_NAME#v}
+        run: java --source 21 bin/package ${GITHUB_REF_NAME#v}
         shell: bash
 
       # The only check that proves the ahead-of-time build kept what it needs: a service

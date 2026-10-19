@@ -47,7 +47,7 @@ have:
 | Bundle | Take it if | Size |
 |---|---|---|
 | `linkedin-archive-explorer-<version>-<os>-<arch>.tar.gz` (`.zip` on Windows) | you don't know what a JDK is, or don't want one | ~22 MB |
-| `linkedin-archive-explorer-<version>-lite.tar.gz` (or `.zip`) | you already have **Java 17 or newer** | ~60 KB |
+| `linkedin-archive-explorer-<version>-lite.tar.gz` (or `.zip`) | you already have **Java 21 or newer** | ~60 KB |
 
 Unpack it, then run `bin/linkedin-archive-explorer` — the command is the same either way.
 With no argument at all it opens the web page in your browser; give it a term and it
@@ -74,9 +74,9 @@ xattr -d -r com.apple.quarantine linkedin-archive-explorer-<version>
 
 ## Prerequisites (to build from source)
 
-**Java 17 or newer** (JDK). This is the only dependency: the program uses just the
+**Java 21 or newer** (JDK). This is the only dependency: the program uses just the
 standard library — no build tool and no external libraries. The published jar is compiled
-with `--release 17`, so it runs on 17 whatever JDK produced it.
+with `--release 21`, so it runs on 21 whatever JDK produced it.
 
 The JDK version is pinned in `mise.toml`. If you use [mise](https://mise.jdx.dev/), install
 it from the project directory with:

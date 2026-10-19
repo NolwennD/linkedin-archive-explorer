@@ -1,4 +1,4 @@
-#!/usr/bin/env -S java --source 17
+#!/usr/bin/env -S java --source 21
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -86,7 +86,7 @@ public final class Package {
    */
   private static void build() throws IOException, InterruptedException {
     int status =
-        new ProcessBuilder("java", "--source", "17", "bin/build").inheritIO().start().waitFor();
+        new ProcessBuilder("java", "--source", "21", "bin/build").inheritIO().start().waitFor();
     if (status != 0) {
       System.exit(status);
     }
@@ -145,7 +145,7 @@ public final class Package {
         #!/bin/sh
         # Runs the explorer on the Java already installed on this machine.
         command -v java >/dev/null 2>&1 || {
-          echo "Java is required (17 or newer), and was not found on the PATH." >&2
+          echo "Java is required (21 or newer), and was not found on the PATH." >&2
           echo "Either install a JDK, or download the bundle that ships its own." >&2
           exit 1
         }
@@ -159,7 +159,7 @@ public final class Package {
         @echo off
         rem Runs the explorer on the Java already installed on this machine.
         where java >nul 2>nul || (
-          echo Java is required ^(17 or newer^), and was not found on the PATH.
+          echo Java is required ^(21 or newer^), and was not found on the PATH.
           echo Either install a JDK, or download the bundle that ships its own.
           exit /b 1
         )

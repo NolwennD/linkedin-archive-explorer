@@ -1,1 +1,1 @@
-@cd /d "%~dp0.." && java --source 17 bin\build %*
+@cd /d "%~dp0.." && java --source 21 bin\build %*

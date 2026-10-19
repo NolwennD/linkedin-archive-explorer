@@ -1,4 +1,4 @@
-#!/usr/bin/env -S java --source 17
+#!/usr/bin/env -S java --source 21
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -24,10 +24,10 @@ public final class Build {
   private static final String JAR = "dist/linkedin-explorer.jar";
 
   /**
-   * Pins the bytecode <em>and</em> the visible API to Java 17, whatever JDK builds. Without
+   * Pins the bytecode <em>and</em> the visible API to Java 21, whatever JDK builds. Without
    * it the jar carries the builder's class file version — a release built on a JDK 25
    * runner would demand a JDK 25, contradicting the documented floor. As a bonus, an
-   * accidental use of a newer API now fails here rather than in the CI's 17 branch.
+   * accidental use of a newer API now fails here rather than in the CI's 21 branch.
    */
   private static final String RELEASE = "--release";
 
@@ -39,10 +39,10 @@ public final class Build {
     Files.createDirectories(Path.of("dist"));
 
     // 1. Modular compile — a forbidden inter-module dependency fails here.
-    runTool("javac", concat(List.of(RELEASE, "17", "--module-source-path", "src", "-d", "out"), javaFiles("src", false)));
+    runTool("javac", concat(List.of(RELEASE, "21", "--module-source-path", "src", "-d", "out"), javaFiles("src", false)));
 
     // 2. Flat compile (module-info excluded) for a plain classpath jar.
-    runTool("javac", concat(List.of(RELEASE, "17", "-d", "build/classes"), javaFiles("src", true)));
+    runTool("javac", concat(List.of(RELEASE, "21", "-d", "build/classes"), javaFiles("src", true)));
 
     // 3. Single runnable jar.
     runTool("jar", List.of("--create", "--file", JAR,
